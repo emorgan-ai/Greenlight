@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Story Analyzer</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: white;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: #464F5D;
+            font-size: 3rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            letter-spacing: -0.5px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #6c757d;
+            margin-bottom: 3rem;
+            font-size: 1.1rem;
+        }
+
+        .input-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 200px;
+            padding: 1rem;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 1rem;
+            resize: vertical;
+            margin-bottom: 1rem;
+            background-color: #f8f9fa;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #464F5D;
+            box-shadow: 0 0 0 2px rgba(70, 79, 93, 0.1);
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 1rem;
+            background-color: #464F5D;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .submit-btn:hover {
+            background-color: #5a6577;
+        }
+
+        #status {
+            margin: 1rem 0;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            display: none;
+        }
+
+        #status.success {
+            background-color: #f0fdf4;
+            color: #22c55e;
+            border: 1px solid #dcfce7;
+            display: block;
+        }
+
+        #status.error {
+            background-color: #fef2f2;
+            color: #ef4444;
+            border: 1px solid #fee2e2;
+            display: block;
+        }
+
+        .analysis-section {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid #e9ecef;
+        }
+
+        .analysis-section h3 {
+            color: #464F5D;
+            margin-bottom: 1rem;
+            font-weight: 600;
+        }
+
+        .analysis-section ul {
+            list-style-type: none;
+            padding-left: 1.5rem;
+        }
+
+        .analysis-section li {
+            margin-bottom: 0.5rem;
+            position: relative;
+        }
+
+        .analysis-section li::before {
+            content: "•";
+            color: #464F5D;
+            position: absolute;
+            left: -1.5rem;
+        }
+
+        .agent-links {
+            margin-top: 1rem;
+        }
+
+        .agent-links a {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            background-color: #464F5D;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            margin-right: 1rem;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+            transition: background-color 0.2s;
+        }
+
+        .agent-links a:hover {
+            background-color: #5a6577;
+        }
+
+        .agent-links .hashtag {
+            color: #464F5D;
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            margin-right: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .similar-title {
+            margin-bottom: 1rem;
+            padding: 1rem;
+            background: white;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+        }
+
+        .similar-title h4 {
+            color: #5a6577;
+            margin-bottom: 0.5rem;
+        }
+
+        .similar-title p {
+            color: #6c757d;
+            font-size: 0.95rem;
+        }
+
+        .email-signup {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 2rem 0;
+            border: 1px solid #e9ecef;
+            text-align: center;
+        }
+
+        .email-signup h3 {
+            color: #464F5D;
+            margin-bottom: 1rem;
+            font-size: 1.2rem;
+        }
+
+        .email-signup p {
+            color: #6c757d;
+            margin-bottom: 1rem;
+            font-size: 0.95rem;
+        }
+
+        .email-form {
+            display: flex;
+            gap: 0.5rem;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        .email-input {
+            flex: 1;
+            padding: 0.75rem;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 1rem;
+        }
+
+        .email-input:focus {
+            outline: none;
+            border-color: #464F5D;
+            box-shadow: 0 0 0 2px rgba(70, 79, 93, 0.1);
+        }
+
+        .subscribe-btn {
+            padding: 0.75rem 1.5rem;
+            background-color: #464F5D;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        .subscribe-btn:hover {
+            background-color: #5a6577;
+        }
+
+        #subscribe-status {
+            margin-top: 1rem;
+            font-size: 0.9rem;
+        }
+
+        #subscribe-status.success {
+            color: #22c55e;
+        }
+
+        #subscribe-status.error {
+            color: #ef4444;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>STORY ANALYZER</h1>
+        <p class="subtitle">Plot with Transparency</p>
+        <div class="email-signup">
+            <h3>Get Access to More Author Tools</h3>
+            <p>Subscribe to learn about our latest tools and resources for authors</p>
+            <div class="email-form">
+                <input type="email" id="email" placeholder="Enter your email" class="email-input">
+                <button onclick="subscribe()" class="subscribe-btn">Subscribe</button>
+            </div>
+            <div id="subscribe-status"></div>
+        </div>
+        
+        <div class="input-container">
+            <textarea id="queryText" placeholder="Enter your plot summary here..."></textarea>
+            <button onclick="analyzeText()" id="analyzeBtn" class="submit-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="16" height="16">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+                </svg>
+                Submit
+            </button>
+        </div>
+
+        <div id="status"></div>
+        <div id="result"></div>
+    </div>
+
+    <script>
+        function formatAnalysis(analysis) {
+            const sections = analysis.split('\n\n');
+            let formattedHtml = '';
+
+            sections.forEach(section => {
+                if (section.trim()) {
+                    const lines = section.trim().split('\n');
+                    const title = lines[0].replace(/^[- ]+/, '');
+                    const content = lines.slice(1);
+
+                    let sectionContent = '';
+                    if (title === 'Agent Research Links') {
+                        sectionContent = `<div class="agent-links">`;
+                        content.forEach(line => {
+                            const cleanLine = line.replace(/^[- ]+/, '');
+                            if (cleanLine.includes('QueryTracker')) {
+                                const url = cleanLine.split(': ')[1];
+                                sectionContent += `<a href="${url}" target="_blank">Search QueryTracker</a>`;
+                            } else if (cleanLine.includes('Manuscript Wishlist')) {
+                                const hashtags = cleanLine.split(': ')[1].split(' ');
+                                hashtags.forEach(tag => {
+                                    sectionContent += `<span class="hashtag">${tag}</span>`;
+                                });
+                            } else if (cleanLine.includes('Publishers Marketplace')) {
+                                const category = cleanLine.split(': ')[1];
+                                sectionContent += `<span class="hashtag">${category}</span>`;
+                            }
+                        });
+                        sectionContent += '</div>';
+                    } else {
+                        sectionContent = `<ul>${content.map(line => `<li>${line.replace(/^[- ]+/, '')}</li>`).join('')}</ul>`;
+                    }
+
+                    formattedHtml += `
+                        <div class="analysis-section">
+                            <h3>${title}</h3>
+                            ${sectionContent}
+                        </div>
+                    `;
+                }
+            });
+
+            return formattedHtml;
+        }
+
+        async function analyzeText() {
+            const text = document.getElementById('queryText').value;
+            const analyzeBtn = document.getElementById('analyzeBtn');
+            const status = document.getElementById('status');
+            const result = document.getElementById('result');
+            
+            if (!text.trim()) {
+                status.textContent = 'Please enter some text to analyze';
+                status.className = 'error';
+                return;
+            }
+
+            analyzeBtn.disabled = true;
+            status.textContent = 'Analyzing...';
+            status.className = '';
+            result.innerHTML = '';
+
+            try {
+                const response = await fetch('/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ text: text })
+                });
+
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.error || `HTTP error! status: ${response.status}`);
+                }
+
+                status.textContent = data.message;
+                status.className = 'success';
+                result.innerHTML = formatAnalysis(data.analysis);
+            } catch (error) {
+                console.error('Error:', error);
+                status.textContent = error.message;
+                status.className = 'error';
+            } finally {
+                analyzeBtn.disabled = false;
+            }
+        }
+
+        async function subscribe() {
+            const email = document.getElementById('email').value;
+            const statusDiv = document.getElementById('subscribe-status');
+            const subscribeBtn = document.querySelector('.subscribe-btn');
+            
+            if (!email) {
+                statusDiv.textContent = 'Please enter your email address';
+                statusDiv.className = 'error';
+                return;
+            }
+
+            subscribeBtn.disabled = true;
+            
+            try {
+                const response = await fetch('/subscribe', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ email: email })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    statusDiv.textContent = data.message;
+                    statusDiv.className = 'success';
+                    document.getElementById('email').value = '';
+                } else {
+                    statusDiv.textContent = data.message;
+                    statusDiv.className = 'error';
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                statusDiv.textContent = 'An error occurred. Please try again.';
+                statusDiv.className = 'error';
+            } finally {
+                subscribeBtn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>

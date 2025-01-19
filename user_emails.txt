@@ -1,0 +1,2 @@
+# Subscriber emails for author tools updates
+# Format: email,signup_date
