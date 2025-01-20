@@ -196,23 +196,17 @@ def analyze_text(text):
         return f"Error: {str(e)}"
 
 @app.route('/analyze', methods=['POST'])
-def analyze_input_text():
-    if not request.is_json:
-        return jsonify({'error': 'Request must be JSON'}), 400
+def analyze():
+    try:
+        data = request.get_json()
+        if not data or 'text' not in data:
+            return jsonify({'error': 'No text provided'}), 400
         
-    data = request.get_json()
-    if 'text' not in data or not data['text'].strip():
-        return jsonify({'error': 'No text provided'}), 400
-    
-    analysis = analyze_text(data['text'])
-    
-    if analysis.startswith('Error:'):
-        return jsonify({'error': analysis}), 500
-        
-    return jsonify({
-        'message': 'Text analyzed successfully!',
-        'analysis': analysis
-    })
+        result = analyze_text(data['text'])
+        return jsonify({'result': result})
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        return jsonify({'error': 'Internal Server Error'}), 500
 
 @app.route('/upload', methods=['GET', 'POST'])
 def upload_file():
