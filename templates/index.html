@@ -373,7 +373,7 @@
 
                 status.textContent = data.message;
                 status.className = 'success';
-                result.innerHTML = formatAnalysis(data.analysis);
+                result.innerHTML = formatAnalysis(data.result);
             } catch (error) {
                 console.error('Error:', error);
                 status.textContent = error.message;
