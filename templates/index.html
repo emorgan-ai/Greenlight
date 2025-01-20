@@ -481,58 +481,86 @@
         function formatAnalysis(text) {
             if (!text) return '';
             
+            console.log('Raw analysis text:', text);
+            
             // Split the text into sections
-            const sections = text.split('\n').filter(line => line.trim());
+            const sections = text.split('\n\n').filter(section => section.trim());
+            console.log('Parsed sections:', sections);
+            
             let formattedHtml = '<div class="analysis-results">';
             
+            // Process each major section
             sections.forEach(section => {
-                if (section.includes(':')) {
-                    const [title, content] = section.split(':').map(s => s.trim());
+                const lines = section.split('\n');
+                if (lines.length === 0) return;
+                
+                const title = lines[0].split(':')[0].trim();
+                console.log('Processing section:', title);
+                
+                if (title === 'COMMERCIAL SCORE') {
+                    const score = lines[0].split(':')[1].trim().split('/')[0];
+                    const scoreClass = parseInt(score) >= 7 ? 'score-high' : parseInt(score) >= 4 ? 'score-medium' : 'score-low';
                     
-                    // Format based on section type
-                    if (title === 'COMMERCIAL SCORE') {
-                        const score = parseInt(content);
-                        const scoreClass = score >= 7 ? 'score-high' : score >= 4 ? 'score-medium' : 'score-low';
-                        
-                        formattedHtml += `
-                            <div class="analysis-section">
-                                <h3 class="section-title">${title}</h3>
-                                <div class="commercial-score">
-                                    <div class="score-value ${scoreClass}">${content}</div>
-                                </div>
-                            </div>`;
-                    } else if (title === 'STRENGTHS' || title === 'WEAKNESSES') {
-                        formattedHtml += `
-                            <div class="analysis-section">
-                                <h3 class="section-title">${title}</h3>
-                                <ul class="points-list">`;
-                        
-                        // Handle bullet points
-                        const points = content.split(/[•-]/).filter(p => p.trim());
-                        points.forEach(point => {
-                            if (point.trim()) {
-                                formattedHtml += `<li>${point.trim()}</li>`;
-                            }
-                        });
-                        
-                        formattedHtml += `</ul></div>`;
-                    } else if (title === 'COMP TITLES') {
-                        formattedHtml += `
-                            <div class="analysis-section">
-                                <h3 class="section-title">${title}</h3>
-                                <div class="comp-titles">
-                                    ${content.split(/[•-]/).filter(p => p.trim()).map(title => 
-                                        `<p class="mb-2">${title.trim()}</p>`
-                                    ).join('')}
-                                </div>
-                            </div>`;
-                    } else {
-                        formattedHtml += `
-                            <div class="analysis-section">
-                                <h3 class="section-title">${title}</h3>
-                                <p class="text-gray-700">${content}</p>
-                            </div>`;
-                    }
+                    formattedHtml += `
+                        <div class="analysis-section">
+                            <h3 class="section-title">${title}</h3>
+                            <div class="commercial-score">
+                                <div class="score-value ${scoreClass}">${score}/10</div>
+                            </div>
+                        </div>`;
+                } else if (title === 'STRENGTHS' || title === 'WEAKNESSES') {
+                    formattedHtml += `
+                        <div class="analysis-section">
+                            <h3 class="section-title">${title}</h3>
+                            <ul class="points-list">`;
+                    
+                    // Add each bullet point
+                    lines.slice(1).forEach(line => {
+                        if (line.trim().startsWith('-')) {
+                            formattedHtml += `<li>${line.substring(1).trim()}</li>`;
+                        }
+                    });
+                    
+                    formattedHtml += `</ul></div>`;
+                } else if (title === 'GENRES') {
+                    formattedHtml += `
+                        <div class="analysis-section">
+                            <h3 class="section-title">${title}</h3>
+                            <ul class="points-list">`;
+                    
+                    lines.slice(1).forEach(line => {
+                        if (line.trim().startsWith('-')) {
+                            formattedHtml += `<li>${line.substring(1).trim()}</li>`;
+                        }
+                    });
+                    
+                    formattedHtml += `</ul></div>`;
+                } else if (title === 'TARGET AUDIENCE') {
+                    formattedHtml += `
+                        <div class="analysis-section">
+                            <h3 class="section-title">${title}</h3>
+                            <ul class="points-list">`;
+                    
+                    lines.slice(1).forEach(line => {
+                        if (line.trim().startsWith('-')) {
+                            formattedHtml += `<li>${line.substring(1).trim()}</li>`;
+                        }
+                    });
+                    
+                    formattedHtml += `</ul></div>`;
+                } else if (title === 'COMP TITLES') {
+                    formattedHtml += `
+                        <div class="analysis-section">
+                            <h3 class="section-title">${title}</h3>
+                            <div class="comp-titles">`;
+                    
+                    lines.slice(1).forEach(line => {
+                        if (line.trim().startsWith('-')) {
+                            formattedHtml += `<p class="mb-2">${line.substring(1).trim()}</p>`;
+                        }
+                    });
+                    
+                    formattedHtml += `</div></div>`;
                 }
             });
             

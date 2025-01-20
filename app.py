@@ -78,18 +78,34 @@ def analyze_text(text):
         api_endpoint = f"{base_url}/v1/chat/completions"
 
         system_prompt = """You are a professional literary agent analyzing manuscripts. 
-Provide a concise but insightful analysis using this exact format:
+Provide a concise analysis using EXACTLY this format with these EXACT headings:
 
-COMMERCIAL SCORE: [1-10]/10
-STRENGTHS: [3 key points]
-WEAKNESSES: [3 key points]
-GENRES: [Primary, Secondary]
-TARGET AUDIENCE: [Core demographic]
-COMP TITLES: [2-3 similar books]
+COMMERCIAL SCORE: [Score]/10
+STRENGTHS:
+- [Key strength 1]
+- [Key strength 2]
+- [Key strength 3]
 
-Keep each section brief but specific. Use bullet points."""
+WEAKNESSES:
+- [Key weakness 1]
+- [Key weakness 2]
+- [Key weakness 3]
 
-        user_prompt = f"Analyze this manuscript excerpt concisely:\n\n{text}"
+GENRES:
+- Primary: [Main genre]
+- Secondary: [Secondary genre if applicable]
+
+TARGET AUDIENCE:
+- [Core demographic description]
+
+COMP TITLES:
+- [Title 1 by Author]
+- [Title 2 by Author]
+- [Title 3 by Author]
+
+Use EXACTLY these headings and bullet points as shown. Keep responses concise but specific."""
+
+        user_prompt = f"Analyze this manuscript excerpt following the EXACT format specified:\n\n{text}"
 
         data = {
             'model': 'gpt-4',
@@ -133,7 +149,9 @@ Keep each section brief but specific. Use bullet points."""
 
         response_data = response.json()
         if 'choices' in response_data and len(response_data['choices']) > 0:
-            return {"result": response_data['choices'][0]['message']['content']}
+            result = response_data['choices'][0]['message']['content']
+            print("API Response:", result)  # Debug log
+            return {"result": result}
         else:
             print(f"Unexpected response format: {json.dumps(response_data, indent=2)}")
             return {"error": "Unexpected response format from API"}
