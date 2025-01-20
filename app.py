@@ -23,28 +23,43 @@ app = Flask(__name__)
 
 # Initialize MongoDB connection
 try:
-    client = MongoClient(os.getenv('MONGODB_URI'))
-    db = client.manuscript_analysis
-    print("MongoDB connected successfully")
+    mongodb_uri = os.getenv('MONGODB_URI')
+    if not mongodb_uri:
+        print("Error: MONGODB_URI not set in environment variables")
+        db = None
+    else:
+        print(f"Attempting to connect to MongoDB with URI starting with: {mongodb_uri[:20]}...")
+        client = MongoClient(mongodb_uri, serverSelectionTimeoutMS=5000)
+        # Force a connection attempt to verify it works
+        client.admin.command('ping')
+        db = client.manuscript_analysis
+        print("MongoDB connected successfully")
 except Exception as e:
-    print(f"Error connecting to MongoDB: {e}")
+    print(f"Error connecting to MongoDB: {str(e)}")
+    print(f"Exception type: {type(e)}")
+    traceback.print_exc()
     db = None
 
 def save_email(email):
     try:
         if not db:
-            print("Error: MongoDB not connected")
+            error_msg = "MongoDB not connected. URI exists: " + str(bool(os.getenv('MONGODB_URI')))
+            print(f"Error: {error_msg}")
             return False
             
+        print(f"Attempting to save email: {email}")
         result = db.subscribers.insert_one({
             'email': email,
             'timestamp': datetime.utcnow(),
             'status': 'active'
         })
         
-        return bool(result.inserted_id)
+        success = bool(result.inserted_id)
+        print(f"Email save {'successful' if success else 'failed'}")
+        return success
     except Exception as e:
-        print(f"Error saving email: {e}")
+        print(f"Error saving email: {str(e)}")
+        print(f"Exception type: {type(e)}")
         traceback.print_exc()
         return False
 
@@ -55,20 +70,31 @@ def index():
 @app.route('/subscribe', methods=['POST'])
 def subscribe():
     try:
-        email = request.json.get('email')
-        if not email:
+        data = request.get_json()
+        if not data or 'email' not in data:
+            print("Error: Invalid request data - missing email")
             return jsonify({'success': False, 'message': 'Email is required'}), 400
+        
+        email = data['email']
+        print(f"Received subscription request for email: {email}")
         
         # Basic email validation
         if '@' not in email or '.' not in email:
+            print(f"Error: Invalid email format - {email}")
             return jsonify({'success': False, 'message': 'Invalid email format'}), 400
         
         if save_email(email):
+            print(f"Successfully subscribed email: {email}")
             return jsonify({'success': True, 'message': 'Thank you for subscribing!'})
         else:
-            return jsonify({'success': False, 'message': 'Error saving email'}), 500
+            error_msg = "Failed to save email. Database connected: " + str(bool(db))
+            print(f"Error: {error_msg}")
+            return jsonify({'success': False, 'message': error_msg}), 500
     except Exception as e:
-        print(f"Subscribe error: {str(e)}")
+        error_msg = f"Subscribe error: {str(e)}"
+        print(error_msg)
+        print(f"Exception type: {type(e)}")
+        traceback.print_exc()
         return jsonify({'success': False, 'message': 'Server error'}), 500
 
 def analyze_text(text):
