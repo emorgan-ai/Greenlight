@@ -290,7 +290,14 @@
         </div>
 
         <div id="status"></div>
-        <div id="result"></div>
+        <div id="result" class="mt-4 p-4 bg-white rounded shadow-sm" style="display: none;">
+            <div id="loading" style="display: none;">
+                <p class="text-center text-gray-600">
+                    <i class="fas fa-spinner fa-spin"></i> Generating analysis... This may take a few moments.
+                </p>
+            </div>
+            <div id="analysisResult" style="display: none;"></div>
+        </div>
     </div>
 
     <script>
@@ -344,6 +351,8 @@
             const analyzeBtn = document.getElementById('analyzeBtn');
             const status = document.getElementById('status');
             const result = document.getElementById('result');
+            const loading = document.getElementById('loading');
+            const analysisResult = document.getElementById('analysisResult');
             
             if (!text.trim()) {
                 status.textContent = 'Please enter some text to analyze';
@@ -354,7 +363,9 @@
             analyzeBtn.disabled = true;
             status.textContent = 'Analyzing...';
             status.className = '';
-            result.innerHTML = '';
+            result.style.display = 'block';
+            loading.style.display = 'block';
+            analysisResult.style.display = 'none';
 
             try {
                 const response = await fetch('/analyze', {
@@ -373,11 +384,16 @@
 
                 status.textContent = data.message;
                 status.className = 'success';
-                result.innerHTML = formatAnalysis(data.result);
+                analysisResult.innerHTML = formatAnalysis(data.result);
+                loading.style.display = 'none';
+                analysisResult.style.display = 'block';
             } catch (error) {
                 console.error('Error:', error);
                 status.textContent = error.message;
                 status.className = 'error';
+                loading.style.display = 'none';
+                analysisResult.style.display = 'block';
+                analysisResult.textContent = 'Error: ' + error.message;
             } finally {
                 analyzeBtn.disabled = false;
             }
