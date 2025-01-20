@@ -60,15 +60,15 @@ def subscribe():
         return jsonify({'success': False, 'message': 'Error saving email'}), 500
 
 def analyze_text(text):
-    api_key = os.getenv('OPENAI_API_KEY')
-    base_url = os.getenv('OPENAI_BASE_URL')
-    
-    if not api_key:
-        return "Error: API key not set. Please add your API key to the .env file."
-    if not base_url:
-        return "Error: API base URL not set. Please add the base URL to the .env file."
-
     try:
+        api_key = os.getenv('OPENAI_API_KEY')
+        base_url = os.getenv('OPENAI_BASE_URL')
+        
+        if not api_key:
+            return "Error: API key not set. Please add your API key to the .env file."
+        if not base_url:
+            return "Error: API base URL not set. Please add the base URL to the .env file."
+
         headers = {
             'Authorization': f'Bearer {api_key}',
             'Content-Type': 'application/json',
@@ -77,10 +77,7 @@ def analyze_text(text):
             'X-Organization-ID': os.getenv('OPENAI_ORG_ID', '')
         }
 
-        # Create a session
         session = requests.Session()
-
-        # Construct the full API endpoint
         api_endpoint = f"{base_url}/v1/chat/completions"
 
         prompt = f"""Analyze the following query letter or excerpt and provide a detailed analysis in the following format:
@@ -130,32 +127,12 @@ def analyze_text(text):
             'max_tokens': 2000
         }
 
-        print(f"\nAttempting connection to: {api_endpoint}")
-        print(f"Headers being sent: {headers}")
-        print(f"Request data: {json.dumps(data, indent=2)}")
-
-        # First try a GET request to test connectivity
-        try:
-            print("\nTesting connection with GET request...")
-            test_response = session.get(base_url)
-            print(f"GET test response status: {test_response.status_code}")
-            print(f"GET test response headers: {dict(test_response.headers)}")
-            print(f"GET test response text: {test_response.text[:200]}")
-        except Exception as e:
-            print(f"GET test failed: {str(e)}")
-            print(f"GET test error type: {type(e)}")
-
-        print("\nSending main POST request...")
         response = session.post(
             api_endpoint,
             headers=headers,
             json=data,
             timeout=30
         )
-
-        print(f"\nResponse status code: {response.status_code}")
-        print(f"Response headers: {dict(response.headers)}")
-        print(f"Raw response text: {response.text[:1000]}")
 
         if response.status_code != 200:
             error_msg = f"API Error: Status {response.status_code}"
@@ -167,79 +144,44 @@ def analyze_text(text):
                     error_msg += f" - {json.dumps(error_data)}"
             except:
                 error_msg += f" - {response.text}"
+            print(error_msg)  # Log the error
             return error_msg
 
-        try:
-            response_data = response.json()
-            if 'choices' in response_data and len(response_data['choices']) > 0:
-                return response_data['choices'][0]['message']['content']
-            else:
-                print(f"Unexpected response format: {json.dumps(response_data, indent=2)}")
-                return "Error: Unexpected response format from API"
-        except json.JSONDecodeError as e:
-            print(f"\nFailed to parse JSON response")
-            print(f"Response content type: {response.headers.get('content-type', 'unknown')}")
-            print(f"Full response text: {response.text}")
-            return f"Error: Could not parse API response - {str(e)}"
+        response_data = response.json()
+        if 'choices' in response_data and len(response_data['choices']) > 0:
+            return response_data['choices'][0]['message']['content']
+        else:
+            print(f"Unexpected response format: {json.dumps(response_data, indent=2)}")
+            return "Error: Unexpected response format from API"
 
-    except requests.exceptions.SSLError as e:
-        print(f"\nSSL Error: {str(e)}")
-        print(f"SSL Error type: {type(e)}")
-        return f"Error: SSL verification failed - {str(e)}"
-    except requests.exceptions.ConnectionError as e:
-        print(f"\nConnection error: {str(e)}")
-        print(f"Connection error type: {type(e)}")
-        return f"Error: Could not connect to API server - {str(e)}"
     except Exception as e:
-        print(f"\nUnexpected error: {str(e)}")
-        print(f"Error type: {type(e)}")
+        print(f"Error in analyze_text: {str(e)}")  # Log the error
         return f"Error: {str(e)}"
 
 @app.route('/analyze', methods=['POST'])
 def analyze():
-    try:
-        data = request.get_json()
-        if not data or 'text' not in data:
-            return jsonify({'error': 'No text provided'}), 400
-        
-        result = analyze_text(data['text'])
-        return jsonify({'result': result})
-    except Exception as e:
-        print(f"Error: {str(e)}")
-        return jsonify({'error': 'Internal Server Error'}), 500
+    data = request.get_json()
+    if not data or 'text' not in data:
+        return jsonify({'error': 'No text provided'}), 400
+    
+    result = analyze_text(data['text'])
+    print(f"Analysis result: {result}")  # Log the result
+    return jsonify({'result': result})
 
 @app.route('/upload', methods=['GET', 'POST'])
 def upload_file():
     if request.method == 'POST':
-        if 'query_letter' not in request.files:
-            return jsonify({'error': 'No query letter uploaded'}), 400
-            
-        query_letter = request.files['query_letter']
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file part'}), 400
+        file = request.files['file']
         
-        if query_letter.filename == '':
+        if file.filename == '':
             return jsonify({'error': 'No selected file'}), 400
-            
-        if query_letter:
-            try:
-                # Save the file
-                filepath = os.path.join(app.config['UPLOAD_FOLDER'], query_letter.filename)
-                query_letter.save(filepath)
-                
-                # Read and analyze the content
-                with open(filepath, 'r', encoding='utf-8') as file:
-                    content = file.read()
-                    analysis = analyze_text(content)
-                    
-                    if analysis.startswith('Error:'):
-                        return jsonify({'error': analysis}), 500
-                    
-                    return jsonify({
-                        'message': 'File uploaded and analyzed successfully!',
-                        'analysis': analysis
-                    })
-            except Exception as e:
-                return jsonify({'error': f'Error processing file: {str(e)}'}), 500
-            
+        
+        # Read the file content into memory
+        file_content = file.read()
+        # Process the file content as needed (e.g., analyze it)
+        return jsonify({'message': 'File uploaded successfully!', 'size': len(file_content)})
     return render_template('index.html')
 
 if __name__ == '__main__':
