@@ -382,25 +382,52 @@
         function formatAnalysis(text) {
             if (!text) return '';
             
-            // Split the text into lines
-            const lines = text.split('\n');
-            let formattedHtml = '';
+            // Split the text into sections
+            const sections = text.split('\n').filter(line => line.trim());
+            let formattedHtml = '<div class="analysis-results">';
             
-            for (const line of lines) {
-                if (line.trim() === '') {
-                    formattedHtml += '<br>';
-                } else if (line.includes(':')) {
-                    // For lines with colons, make the part before the colon bold
-                    const [title, ...rest] = line.split(':');
-                    formattedHtml += `<p><strong>${title}:</strong>${rest.join(':')}</p>`;
-                } else if (line.trim().startsWith('-')) {
-                    // For bullet points, add some indentation
-                    formattedHtml += `<p class="ml-4">${line}</p>`;
-                } else {
-                    formattedHtml += `<p>${line}</p>`;
+            sections.forEach(section => {
+                if (section.includes(':')) {
+                    const [title, content] = section.split(':').map(s => s.trim());
+                    
+                    // Format based on section type
+                    if (title === 'COMMERCIAL SCORE') {
+                        formattedHtml += `
+                            <div class="mb-4">
+                                <h3 class="text-xl font-bold text-gray-800">${title}</h3>
+                                <div class="mt-2 text-2xl font-bold ${parseInt(content) >= 7 ? 'text-green-600' : parseInt(content) >= 4 ? 'text-yellow-600' : 'text-red-600'}">
+                                    ${content}
+                                </div>
+                            </div>`;
+                    } else {
+                        formattedHtml += `
+                            <div class="mb-4">
+                                <h3 class="text-xl font-bold text-gray-800">${title}</h3>
+                                <div class="mt-2">`;
+                        
+                        // Handle bullet points
+                        if (content.includes('•') || content.includes('-')) {
+                            const points = content.split(/[•-]/).filter(p => p.trim());
+                            formattedHtml += '<ul class="list-disc pl-5">';
+                            points.forEach(point => {
+                                if (point.trim()) {
+                                    formattedHtml += `<li class="text-gray-700">${point.trim()}</li>`;
+                                }
+                            });
+                            formattedHtml += '</ul>';
+                        } else {
+                            formattedHtml += `<p class="text-gray-700">${content}</p>`;
+                        }
+                        
+                        formattedHtml += '</div></div>';
+                    }
+                } else if (section.trim()) {
+                    // Handle any non-section text
+                    formattedHtml += `<p class="text-gray-700 mb-2">${section}</p>`;
                 }
-            }
+            });
             
+            formattedHtml += '</div>';
             return formattedHtml;
         }
 
