@@ -77,21 +77,36 @@ def analyze_text(text):
         session = requests.Session()
         api_endpoint = f"{base_url}/v1/chat/completions"
 
-        # Shorter system message and more focused prompt
+        system_prompt = """You are a professional literary agent analyzing manuscripts. 
+Provide a concise but insightful analysis using this exact format:
+
+COMMERCIAL SCORE: [1-10]/10
+STRENGTHS: [3 key points]
+WEAKNESSES: [3 key points]
+GENRES: [Primary, Secondary]
+TARGET AUDIENCE: [Core demographic]
+COMP TITLES: [2-3 similar books]
+
+Keep each section brief but specific. Use bullet points."""
+
+        user_prompt = f"Analyze this manuscript excerpt concisely:\n\n{text}"
+
         data = {
             'model': 'gpt-4',
             'messages': [
                 {
                     'role': 'system',
-                    'content': 'You are a literary agent. Provide a brief, focused analysis of the text.'
+                    'content': system_prompt
                 },
                 {
                     'role': 'user',
-                    'content': f"Analyze this text briefly (max 1000 tokens):\n\n{text}"
+                    'content': user_prompt
                 }
             ],
             'temperature': 0.7,
-            'max_tokens': 1000  # Reduced token limit
+            'max_tokens': 1000,
+            'presence_penalty': 0.3,
+            'frequency_penalty': 0.3
         }
 
         print("Sending request to OpenAI API...")
@@ -99,7 +114,7 @@ def analyze_text(text):
             api_endpoint,
             headers=headers,
             json=data,
-            timeout=8  # Reduced timeout to ensure we don't hit Vercel's limit
+            timeout=8
         )
         print(f"Response status code: {response.status_code}")
 
