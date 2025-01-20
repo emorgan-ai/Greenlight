@@ -26,8 +26,9 @@ def get_db():
     try:
         mongodb_uri = os.getenv('MONGODB_URI')
         if not mongodb_uri:
-            print("Error: MONGODB_URI not set in environment variables")
-            return None
+            error_msg = "Error: MONGODB_URI not set in environment variables"
+            print(error_msg)
+            raise Exception(error_msg)
 
         print(f"Attempting to connect to MongoDB with URI starting with: {mongodb_uri[:20]}...")
         client = MongoClient(mongodb_uri, 
@@ -41,21 +42,21 @@ def get_db():
         print("MongoDB connected successfully")
         return db
     except Exception as e:
-        print(f"Error connecting to MongoDB: {str(e)}")
-        print(f"Exception type: {type(e)}")
+        error_msg = f"Error connecting to MongoDB: {str(e)}\nType: {type(e)}"
+        print(error_msg)
         traceback.print_exc()
-        return None
+        raise  # Re-raise the exception to be caught by the caller
 
 def save_email(email):
     try:
         print(f"Attempting to save email: {email}")
         
         # Get fresh DB connection
-        db = get_db()
+        db = get_db()  # This may raise an exception now
         if not db:
             error_msg = "Could not connect to MongoDB. URI exists: " + str(bool(os.getenv('MONGODB_URI')))
             print(f"Error: {error_msg}")
-            return False
+            raise Exception(error_msg)
             
         result = db.subscribers.insert_one({
             'email': email,
@@ -65,12 +66,14 @@ def save_email(email):
         
         success = bool(result.inserted_id)
         print(f"Email save {'successful' if success else 'failed'}")
+        if not success:
+            raise Exception("Failed to get inserted_id from MongoDB")
         return success
     except Exception as e:
-        print(f"Error saving email: {str(e)}")
-        print(f"Exception type: {type(e)}")
+        error_msg = f"Error saving email: {str(e)}\nType: {type(e)}"
+        print(error_msg)
         traceback.print_exc()
-        return False
+        raise  # Re-raise the exception to be caught by the caller
 
 @app.route('/')
 def index():
@@ -100,11 +103,11 @@ def subscribe():
             print(f"Error: {error_msg}")
             return jsonify({'success': False, 'message': error_msg}), 500
     except Exception as e:
-        error_msg = f"Subscribe error: {str(e)}"
+        error_msg = f"Subscribe error: {str(e)}\nType: {type(e)}"
         print(error_msg)
-        print(f"Exception type: {type(e)}")
         traceback.print_exc()
-        return jsonify({'success': False, 'message': 'Server error'}), 500
+        # For debugging, return the actual error message
+        return jsonify({'success': False, 'message': error_msg}), 500
 
 def analyze_text(text):
     try:
@@ -236,7 +239,7 @@ Use EXACTLY these headings and bullet points as shown. Keep responses concise bu
             return {"error": error_msg}
 
     except Exception as e:
-        error_msg = f"Server error in analyze_text: {str(e)}"
+        error_msg = f"Server error in analyze_text: {str(e)}\nType: {type(e)}"
         print(error_msg)
         import traceback
         print(f"Traceback: {traceback.format_exc()}")
@@ -272,7 +275,7 @@ def analyze():
         return jsonify(result)
 
     except Exception as e:
-        error_msg = f"Server error: {str(e)}"
+        error_msg = f"Server error: {str(e)}\nType: {type(e)}"
         print(f"Unexpected error in /analyze: {error_msg}")
         print(f"Exception type: {type(e)}")
         import traceback
@@ -294,7 +297,7 @@ def upload_file():
             file_content = file.read()
             return jsonify({'message': 'File uploaded successfully!', 'size': len(file_content)})
         except Exception as e:
-            error_msg = f"Upload error: {str(e)}"
+            error_msg = f"Upload error: {str(e)}\nType: {type(e)}"
             print(error_msg)
             return jsonify({'error': error_msg}), 500
     return render_template('index.html')
@@ -325,9 +328,10 @@ def get_subscribers():
             'subscribers': subscribers
         })
     except Exception as e:
-        print(f"Error getting subscribers: {e}")
+        error_msg = f"Error getting subscribers: {str(e)}\nType: {type(e)}"
+        print(error_msg)
         traceback.print_exc()
-        return jsonify({'error': 'Server error'}), 500
+        return jsonify({'error': error_msg}), 500
 
 @app.route('/subscribers/export', methods=['GET'])
 def export_subscribers():
@@ -358,9 +362,10 @@ def export_subscribers():
             'Content-Disposition': 'attachment; filename=subscribers.csv'
         }
     except Exception as e:
-        print(f"Error exporting subscribers: {e}")
+        error_msg = f"Error exporting subscribers: {str(e)}\nType: {type(e)}"
+        print(error_msg)
         traceback.print_exc()
-        return jsonify({'error': 'Server error'}), 500
+        return jsonify({'error': error_msg}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, port=9000)
