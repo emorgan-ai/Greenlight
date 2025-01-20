@@ -301,51 +301,6 @@
     </div>
 
     <script>
-        function formatAnalysis(analysis) {
-            const sections = analysis.split('\n\n');
-            let formattedHtml = '';
-
-            sections.forEach(section => {
-                if (section.trim()) {
-                    const lines = section.trim().split('\n');
-                    const title = lines[0].replace(/^[- ]+/, '');
-                    const content = lines.slice(1);
-
-                    let sectionContent = '';
-                    if (title === 'Agent Research Links') {
-                        sectionContent = `<div class="agent-links">`;
-                        content.forEach(line => {
-                            const cleanLine = line.replace(/^[- ]+/, '');
-                            if (cleanLine.includes('QueryTracker')) {
-                                const url = cleanLine.split(': ')[1];
-                                sectionContent += `<a href="${url}" target="_blank">Search QueryTracker</a>`;
-                            } else if (cleanLine.includes('Manuscript Wishlist')) {
-                                const hashtags = cleanLine.split(': ')[1].split(' ');
-                                hashtags.forEach(tag => {
-                                    sectionContent += `<span class="hashtag">${tag}</span>`;
-                                });
-                            } else if (cleanLine.includes('Publishers Marketplace')) {
-                                const category = cleanLine.split(': ')[1];
-                                sectionContent += `<span class="hashtag">${category}</span>`;
-                            }
-                        });
-                        sectionContent += '</div>';
-                    } else {
-                        sectionContent = `<ul>${content.map(line => `<li>${line.replace(/^[- ]+/, '')}</li>`).join('')}</ul>`;
-                    }
-
-                    formattedHtml += `
-                        <div class="analysis-section">
-                            <h3>${title}</h3>
-                            ${sectionContent}
-                        </div>
-                    `;
-                }
-            });
-
-            return formattedHtml;
-        }
-
         async function analyzeText() {
             const text = document.getElementById('queryText').value;
             const analyzeBtn = document.getElementById('analyzeBtn');
@@ -356,16 +311,15 @@
             
             if (!text.trim()) {
                 status.textContent = 'Please enter some text to analyze';
-                status.className = 'error';
                 return;
             }
 
+            // Disable button and show loading state
             analyzeBtn.disabled = true;
-            status.textContent = 'Analyzing...';
-            status.className = '';
             result.style.display = 'block';
             loading.style.display = 'block';
             analysisResult.style.display = 'none';
+            status.textContent = '';
 
             try {
                 const response = await fetch('/analyze', {
@@ -376,27 +330,54 @@
                     body: JSON.stringify({ text: text })
                 });
 
-                const data = await response.json();
-                
+                // Check if the response is ok (status in 200-299 range)
                 if (!response.ok) {
-                    throw new Error(data.error || `HTTP error! status: ${response.status}`);
+                    throw new Error(`HTTP error! status: ${response.status}`);
                 }
 
-                status.textContent = data.message;
-                status.className = 'success';
-                analysisResult.innerHTML = formatAnalysis(data.result);
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+
+                // Hide loading and show results
                 loading.style.display = 'none';
                 analysisResult.style.display = 'block';
+                analysisResult.innerHTML = formatAnalysis(data.result);
             } catch (error) {
                 console.error('Error:', error);
-                status.textContent = error.message;
-                status.className = 'error';
                 loading.style.display = 'none';
                 analysisResult.style.display = 'block';
-                analysisResult.textContent = 'Error: ' + error.message;
+                analysisResult.innerHTML = `<div class="error-message">Error: ${error.message}</div>`;
             } finally {
                 analyzeBtn.disabled = false;
             }
+        }
+
+        function formatAnalysis(text) {
+            if (!text) return '';
+            
+            // Split the text into lines
+            const lines = text.split('\n');
+            let formattedHtml = '';
+            
+            for (const line of lines) {
+                if (line.trim() === '') {
+                    formattedHtml += '<br>';
+                } else if (line.includes(':')) {
+                    // For lines with colons, make the part before the colon bold
+                    const [title, ...rest] = line.split(':');
+                    formattedHtml += `<p><strong>${title}:</strong>${rest.join(':')}</p>`;
+                } else if (line.trim().startsWith('-')) {
+                    // For bullet points, add some indentation
+                    formattedHtml += `<p class="ml-4">${line}</p>`;
+                } else {
+                    formattedHtml += `<p>${line}</p>`;
+                }
+            }
+            
+            return formattedHtml;
         }
 
         async function subscribe() {

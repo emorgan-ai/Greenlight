@@ -57,10 +57,10 @@ def analyze_text(text):
         
         if not api_key:
             print("Error: API key not set")
-            return "Error: API key not set. Please check server configuration."
+            return {"error": "API key not set. Please check server configuration."}
         if not base_url:
             print("Error: API base URL not set")
-            return "Error: API base URL not set. Please check server configuration."
+            return {"error": "API base URL not set. Please check server configuration."}
 
         print(f"Making request to: {base_url}")
         
@@ -113,23 +113,23 @@ def analyze_text(text):
             except:
                 error_msg += f" - {response.text}"
             print(error_msg)
-            return error_msg
+            return {"error": error_msg}
 
         response_data = response.json()
         if 'choices' in response_data and len(response_data['choices']) > 0:
-            return response_data['choices'][0]['message']['content']
+            return {"result": response_data['choices'][0]['message']['content']}
         else:
             print(f"Unexpected response format: {json.dumps(response_data, indent=2)}")
-            return "Error: Unexpected response format from API"
+            return {"error": "Unexpected response format from API"}
 
     except requests.exceptions.RequestException as e:
         error_msg = f"Request error: {str(e)}"
         print(error_msg)
-        return error_msg
+        return {"error": error_msg}
     except Exception as e:
         error_msg = f"Server error: {str(e)}"
         print(error_msg)
-        return error_msg
+        return {"error": error_msg}
 
 @app.route('/analyze', methods=['POST'])
 def analyze():
@@ -139,8 +139,11 @@ def analyze():
             return jsonify({'error': 'No text provided'}), 400
         
         result = analyze_text(data['text'])
+        if 'error' in result:
+            return jsonify(result), 500
+        
         print(f"Analysis completed successfully")
-        return jsonify({'result': result})
+        return jsonify(result)
     except Exception as e:
         error_msg = f"Analysis error: {str(e)}"
         print(error_msg)
