@@ -40,6 +40,10 @@ def save_email(email):
         print(f"Error saving email: {e}")
         return False
 
+@app.route('/')
+def index():
+    return render_template('index.html')
+
 @app.route('/subscribe', methods=['POST'])
 def subscribe():
     email = request.json.get('email')
@@ -58,14 +62,27 @@ def subscribe():
 def analyze_text(text):
     api_key = os.getenv('OPENAI_API_KEY')
     base_url = os.getenv('OPENAI_BASE_URL')
-    org_id = os.getenv('OPENAI_ORG_ID')
-
+    
     if not api_key:
-        return "Error: OpenAI API key not set. Please add your API key to the .env file."
+        return "Error: API key not set. Please add your API key to the .env file."
     if not base_url:
-        return "Error: OpenAI base URL not set. Please add the base URL to the .env file."
+        return "Error: API base URL not set. Please add the base URL to the .env file."
 
     try:
+        headers = {
+            'Authorization': f'Bearer {api_key}',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'User-Agent': 'ManuscriptAnalysis/1.0',
+            'X-Organization-ID': os.getenv('OPENAI_ORG_ID', '')
+        }
+
+        # Create a session
+        session = requests.Session()
+
+        # Construct the full API endpoint
+        api_endpoint = f"{base_url}/v1/chat/completions"
+
         prompt = f"""Analyze the following query letter or excerpt and provide a detailed analysis in the following format:
 
         Commercial Viability Score (1-10)
@@ -98,83 +115,85 @@ def analyze_text(text):
         
         Similar Published Books (3-5 titles)
         - Title by Author (Year) - Estimated Sales: [number] copies (if available). Brief explanation of similarities
-        - Title by Author (Year) - Estimated Sales: [number] copies (if available). Brief explanation of similarities
-        - Title by Author (Year) - Estimated Sales: [number] copies (if available). Brief explanation of similarities
-        - Title by Author (Year) - Estimated Sales: [number] copies (if relevant). Brief explanation of similarities
-        - Title by Author (Year) - Estimated Sales: [number] copies (if relevant). Brief explanation of similarities
         
-        Similar Movies/TV Shows (3-5 titles)
-        - Title 1: Brief explanation of similarities
-        - Title 2: Brief explanation of similarities
-        - Title 3: Brief explanation of similarities
-        - Title 4: Brief explanation of similarities (if relevant)
-        - Title 5: Brief explanation of similarities (if relevant)
-
         Text to analyze:
         {text}
-        
-        Please ensure each section is clearly separated by blank lines and use consistent formatting with dashes for list items. Be brutally honest in the commercial viability assessment, highlighting both strengths and potential market challenges."""
-
-        # Remove any whitespace from the API key
-        clean_api_key = api_key.strip()
-        
-        # Try different auth header formats
-        headers = {
-            'Authorization': clean_api_key,  # Try direct key
-            'Content-Type': 'application/json'
-        }
+        """
 
         data = {
-            'model': 'gpt-3.5-turbo',
+            'model': 'gpt-4',
             'messages': [
-                {'role': 'system', 'content': 'You are a literary expert skilled in analyzing query letters and manuscripts.'},
+                {'role': 'system', 'content': 'You are a professional literary agent and publishing expert.'},
                 {'role': 'user', 'content': prompt}
             ],
             'temperature': 0.7,
             'max_tokens': 2000
         }
 
-        print("Making API request...")  # Debug print
-        print(f"Base URL: {base_url}")  # Debug print
-        print(f"Headers (auth type): {headers['Authorization'].split('-')[0] if headers.get('Authorization') else 'None'}")  # Debug print auth type only
+        print(f"\nAttempting connection to: {api_endpoint}")
+        print(f"Headers being sent: {headers}")
+        print(f"Request data: {json.dumps(data, indent=2)}")
 
-        response = requests.post(
-            f"{base_url.strip()}/chat/completions",
+        # First try a GET request to test connectivity
+        try:
+            print("\nTesting connection with GET request...")
+            test_response = session.get(base_url)
+            print(f"GET test response status: {test_response.status_code}")
+            print(f"GET test response headers: {dict(test_response.headers)}")
+            print(f"GET test response text: {test_response.text[:200]}")
+        except Exception as e:
+            print(f"GET test failed: {str(e)}")
+            print(f"GET test error type: {type(e)}")
+
+        print("\nSending main POST request...")
+        response = session.post(
+            api_endpoint,
             headers=headers,
             json=data,
-            timeout=30  # Add timeout
+            timeout=30
         )
 
-        if response.status_code == 401:
-            # Try alternative header format
-            headers['Authorization'] = f'Bearer {clean_api_key}'
-            print("Retrying with Bearer token...")  # Debug print
-            response = requests.post(
-                f"{base_url.strip()}/chat/completions",
-                headers=headers,
-                json=data,
-                timeout=30
-            )
-
-        if response.status_code == 401:
-            print("Authentication error. Full response:", response.text)
-            return """Error: Authentication failed. Please verify:
-1. API key format is correct
-2. API key has not expired
-3. Base URL matches your API provider
-Current error: {response.text}"""
-
-        print(f"Response status: {response.status_code}")  # Debug print
-        print(f"Response text: {response.text}")  # Debug print
+        print(f"\nResponse status code: {response.status_code}")
+        print(f"Response headers: {dict(response.headers)}")
+        print(f"Raw response text: {response.text[:1000]}")
 
         if response.status_code != 200:
-            return f"Error code: {response.status_code} - {response.text}"
+            error_msg = f"API Error: Status {response.status_code}"
+            try:
+                error_data = response.json()
+                if 'error' in error_data:
+                    error_msg += f" - {error_data['error'].get('message', '')}"
+                else:
+                    error_msg += f" - {json.dumps(error_data)}"
+            except:
+                error_msg += f" - {response.text}"
+            return error_msg
 
-        response_data = response.json()
-        return response_data['choices'][0]['message']['content']
+        try:
+            response_data = response.json()
+            if 'choices' in response_data and len(response_data['choices']) > 0:
+                return response_data['choices'][0]['message']['content']
+            else:
+                print(f"Unexpected response format: {json.dumps(response_data, indent=2)}")
+                return "Error: Unexpected response format from API"
+        except json.JSONDecodeError as e:
+            print(f"\nFailed to parse JSON response")
+            print(f"Response content type: {response.headers.get('content-type', 'unknown')}")
+            print(f"Full response text: {response.text}")
+            return f"Error: Could not parse API response - {str(e)}"
+
+    except requests.exceptions.SSLError as e:
+        print(f"\nSSL Error: {str(e)}")
+        print(f"SSL Error type: {type(e)}")
+        return f"Error: SSL verification failed - {str(e)}"
+    except requests.exceptions.ConnectionError as e:
+        print(f"\nConnection error: {str(e)}")
+        print(f"Connection error type: {type(e)}")
+        return f"Error: Could not connect to API server - {str(e)}"
     except Exception as e:
-        print(f"Error in analyze_text: {str(e)}")
-        return f"Error analyzing text: {str(e)}"
+        print(f"\nUnexpected error: {str(e)}")
+        print(f"Error type: {type(e)}")
+        return f"Error: {str(e)}"
 
 @app.route('/analyze', methods=['POST'])
 def analyze_input_text():
@@ -195,7 +214,7 @@ def analyze_input_text():
         'analysis': analysis
     })
 
-@app.route('/', methods=['GET', 'POST'])
+@app.route('/upload', methods=['GET', 'POST'])
 def upload_file():
     if request.method == 'POST':
         if 'query_letter' not in request.files:
@@ -230,4 +249,5 @@ def upload_file():
     return render_template('index.html')
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    print("\nStarting server on port 9000...")
+    app.run(debug=True, port=9000)
