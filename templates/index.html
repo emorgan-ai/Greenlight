@@ -293,7 +293,9 @@
         <div id="result" class="mt-4 p-4 bg-white rounded shadow-sm" style="display: none;">
             <div id="loading" style="display: none;">
                 <p class="text-center text-gray-600">
-                    <i class="fas fa-spinner fa-spin"></i> Generating analysis... This may take a few moments.
+                    <i class="fas fa-spinner fa-spin"></i> Analyzing your text... This may take a few moments.
+                    <br>
+                    <small class="text-muted">For best results, keep your text under 1000 words.</small>
                 </p>
             </div>
             <div id="analysisResult" style="display: none;"></div>
@@ -314,6 +316,13 @@
                 return;
             }
 
+            // Check text length
+            const wordCount = text.trim().split(/\s+/).length;
+            if (wordCount > 1000) {
+                status.textContent = 'Please enter a shorter text (maximum 1000 words)';
+                return;
+            }
+
             // Disable button and show loading state
             analyzeBtn.disabled = true;
             result.style.display = 'block';
@@ -322,17 +331,26 @@
             status.textContent = '';
 
             try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 25000); // 25 second timeout
+
                 const response = await fetch('/analyze', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ text: text })
+                    body: JSON.stringify({ text: text }),
+                    signal: controller.signal
                 });
+
+                clearTimeout(timeoutId);
 
                 // Check if the response is ok (status in 200-299 range)
                 if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                    if (response.status === 504) {
+                        throw new Error('The request timed out. Please try again with a shorter text.');
+                    }
+                    throw new Error(`Request failed with status ${response.status}`);
                 }
 
                 const data = await response.json();
@@ -349,7 +367,13 @@
                 console.error('Error:', error);
                 loading.style.display = 'none';
                 analysisResult.style.display = 'block';
-                analysisResult.innerHTML = `<div class="error-message">Error: ${error.message}</div>`;
+                analysisResult.innerHTML = `
+                    <div class="error-message p-4 bg-red-100 text-red-700 rounded">
+                        <p><strong>Error:</strong> ${error.message}</p>
+                        ${error.message.includes('timed out') ? 
+                            '<p class="mt-2">Suggestions:<br>- Try submitting a shorter text<br>- Break your text into smaller sections</p>' 
+                            : ''}
+                    </div>`;
             } finally {
                 analyzeBtn.disabled = false;
             }

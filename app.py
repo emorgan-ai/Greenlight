@@ -77,20 +77,21 @@ def analyze_text(text):
         session = requests.Session()
         api_endpoint = f"{base_url}/v1/chat/completions"
 
+        # Shorter system message and more focused prompt
         data = {
             'model': 'gpt-4',
             'messages': [
                 {
                     'role': 'system',
-                    'content': 'You are a professional literary agent and publishing expert.'
+                    'content': 'You are a literary agent. Provide a brief, focused analysis of the text.'
                 },
                 {
                     'role': 'user',
-                    'content': text
+                    'content': f"Analyze this text briefly (max 1000 tokens):\n\n{text}"
                 }
             ],
             'temperature': 0.7,
-            'max_tokens': 2000
+            'max_tokens': 1000  # Reduced token limit
         }
 
         print("Sending request to OpenAI API...")
@@ -98,7 +99,7 @@ def analyze_text(text):
             api_endpoint,
             headers=headers,
             json=data,
-            timeout=30
+            timeout=8  # Reduced timeout to ensure we don't hit Vercel's limit
         )
         print(f"Response status code: {response.status_code}")
 
@@ -122,6 +123,10 @@ def analyze_text(text):
             print(f"Unexpected response format: {json.dumps(response_data, indent=2)}")
             return {"error": "Unexpected response format from API"}
 
+    except requests.exceptions.Timeout:
+        error_msg = "Request timed out. Please try again with a shorter text."
+        print(error_msg)
+        return {"error": error_msg}
     except requests.exceptions.RequestException as e:
         error_msg = f"Request error: {str(e)}"
         print(error_msg)
