@@ -21,33 +21,42 @@ print(f"MONGODB_URI exists: {bool(os.getenv('MONGODB_URI'))}")
 
 app = Flask(__name__)
 
-# Initialize MongoDB connection
-try:
-    mongodb_uri = os.getenv('MONGODB_URI')
-    if not mongodb_uri:
-        print("Error: MONGODB_URI not set in environment variables")
-        db = None
-    else:
+def get_db():
+    """Get MongoDB connection, creating it if necessary"""
+    try:
+        mongodb_uri = os.getenv('MONGODB_URI')
+        if not mongodb_uri:
+            print("Error: MONGODB_URI not set in environment variables")
+            return None
+
         print(f"Attempting to connect to MongoDB with URI starting with: {mongodb_uri[:20]}...")
-        client = MongoClient(mongodb_uri, serverSelectionTimeoutMS=5000)
+        client = MongoClient(mongodb_uri, 
+                           serverSelectionTimeoutMS=5000,
+                           connectTimeoutMS=5000,
+                           socketTimeoutMS=5000)
+        
         # Force a connection attempt to verify it works
         client.admin.command('ping')
         db = client.manuscript_analysis
         print("MongoDB connected successfully")
-except Exception as e:
-    print(f"Error connecting to MongoDB: {str(e)}")
-    print(f"Exception type: {type(e)}")
-    traceback.print_exc()
-    db = None
+        return db
+    except Exception as e:
+        print(f"Error connecting to MongoDB: {str(e)}")
+        print(f"Exception type: {type(e)}")
+        traceback.print_exc()
+        return None
 
 def save_email(email):
     try:
+        print(f"Attempting to save email: {email}")
+        
+        # Get fresh DB connection
+        db = get_db()
         if not db:
-            error_msg = "MongoDB not connected. URI exists: " + str(bool(os.getenv('MONGODB_URI')))
+            error_msg = "Could not connect to MongoDB. URI exists: " + str(bool(os.getenv('MONGODB_URI')))
             print(f"Error: {error_msg}")
             return False
             
-        print(f"Attempting to save email: {email}")
         result = db.subscribers.insert_one({
             'email': email,
             'timestamp': datetime.utcnow(),
@@ -87,7 +96,7 @@ def subscribe():
             print(f"Successfully subscribed email: {email}")
             return jsonify({'success': True, 'message': 'Thank you for subscribing!'})
         else:
-            error_msg = "Failed to save email. Database connected: " + str(bool(db))
+            error_msg = "Failed to save email. Database connected: " + str(bool(get_db()))
             print(f"Error: {error_msg}")
             return jsonify({'success': False, 'message': error_msg}), 500
     except Exception as e:
@@ -298,6 +307,8 @@ def get_subscribers():
         if not secret_key or secret_key != os.getenv('ADMIN_KEY'):
             return jsonify({'error': 'Unauthorized'}), 401
 
+        # Get fresh DB connection
+        db = get_db()
         if not db:
             return jsonify({'error': 'Database not connected'}), 500
 
@@ -326,6 +337,8 @@ def export_subscribers():
         if not secret_key or secret_key != os.getenv('ADMIN_KEY'):
             return jsonify({'error': 'Unauthorized'}), 401
 
+        # Get fresh DB connection
+        db = get_db()
         if not db:
             return jsonify({'error': 'Database not connected'}), 500
 
