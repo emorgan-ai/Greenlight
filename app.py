@@ -53,7 +53,7 @@ def save_email(email):
         
         # Get fresh DB connection
         db = get_db()  # This may raise an exception now
-        if not db:
+        if db is None:
             error_msg = "Could not connect to MongoDB. URI exists: " + str(bool(os.getenv('MONGODB_URI')))
             print(f"Error: {error_msg}")
             raise Exception(error_msg)
@@ -99,7 +99,8 @@ def subscribe():
             print(f"Successfully subscribed email: {email}")
             return jsonify({'success': True, 'message': 'Thank you for subscribing!'})
         else:
-            error_msg = "Failed to save email. Database connected: " + str(bool(get_db()))
+            db = get_db()
+            error_msg = "Failed to save email. Database connected: " + str(db is not None)
             print(f"Error: {error_msg}")
             return jsonify({'success': False, 'message': error_msg}), 500
     except Exception as e:
@@ -312,7 +313,7 @@ def get_subscribers():
 
         # Get fresh DB connection
         db = get_db()
-        if not db:
+        if db is None:
             return jsonify({'error': 'Database not connected'}), 500
 
         subscribers = list(db.subscribers.find(
@@ -343,7 +344,7 @@ def export_subscribers():
 
         # Get fresh DB connection
         db = get_db()
-        if not db:
+        if db is None:
             return jsonify({'error': 'Database not connected'}), 500
 
         subscribers = list(db.subscribers.find(
