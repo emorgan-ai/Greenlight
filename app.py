@@ -5,6 +5,9 @@ from dotenv import load_dotenv
 import sys
 import json
 from datetime import datetime
+from pymongo import MongoClient
+from bson import json_util
+import traceback
 
 # Load environment variables from .env file
 load_dotenv()
@@ -14,16 +17,35 @@ print("Environment Setup:")
 print(f"OPENAI_API_KEY exists: {bool(os.getenv('OPENAI_API_KEY'))}")
 print(f"OPENAI_BASE_URL exists: {bool(os.getenv('OPENAI_BASE_URL'))}")
 print(f"OPENAI_ORG_ID exists: {bool(os.getenv('OPENAI_ORG_ID'))}")
+print(f"MONGODB_URI exists: {bool(os.getenv('MONGODB_URI'))}")
 
 app = Flask(__name__)
 
+# Initialize MongoDB connection
+try:
+    client = MongoClient(os.getenv('MONGODB_URI'))
+    db = client.manuscript_analysis
+    print("MongoDB connected successfully")
+except Exception as e:
+    print(f"Error connecting to MongoDB: {e}")
+    db = None
+
 def save_email(email):
     try:
-        # In a production environment, you should use a proper database
-        # For now, we'll just return success without actually saving
-        return True
+        if not db:
+            print("Error: MongoDB not connected")
+            return False
+            
+        result = db.subscribers.insert_one({
+            'email': email,
+            'timestamp': datetime.utcnow(),
+            'status': 'active'
+        })
+        
+        return bool(result.inserted_id)
     except Exception as e:
         print(f"Error saving email: {e}")
+        traceback.print_exc()
         return False
 
 @app.route('/')
@@ -241,6 +263,65 @@ def upload_file():
             print(error_msg)
             return jsonify({'error': error_msg}), 500
     return render_template('index.html')
+
+@app.route('/subscribers', methods=['GET'])
+def get_subscribers():
+    try:
+        # Check if the request includes a secret key
+        secret_key = request.args.get('key')
+        if not secret_key or secret_key != os.getenv('ADMIN_KEY'):
+            return jsonify({'error': 'Unauthorized'}), 401
+
+        if not db:
+            return jsonify({'error': 'Database not connected'}), 500
+
+        subscribers = list(db.subscribers.find(
+            {'status': 'active'}, 
+            {'_id': 0, 'email': 1, 'timestamp': 1}
+        ))
+        
+        # Convert to JSON-serializable format
+        subscribers = json.loads(json_util.dumps(subscribers))
+        
+        return jsonify({
+            'count': len(subscribers),
+            'subscribers': subscribers
+        })
+    except Exception as e:
+        print(f"Error getting subscribers: {e}")
+        traceback.print_exc()
+        return jsonify({'error': 'Server error'}), 500
+
+@app.route('/subscribers/export', methods=['GET'])
+def export_subscribers():
+    try:
+        # Check if the request includes a secret key
+        secret_key = request.args.get('key')
+        if not secret_key or secret_key != os.getenv('ADMIN_KEY'):
+            return jsonify({'error': 'Unauthorized'}), 401
+
+        if not db:
+            return jsonify({'error': 'Database not connected'}), 500
+
+        subscribers = list(db.subscribers.find(
+            {'status': 'active'}, 
+            {'_id': 0, 'email': 1, 'timestamp': 1}
+        ))
+        
+        # Create CSV-formatted string
+        csv_data = "Email,Timestamp\n"
+        for sub in subscribers:
+            csv_data += f"{sub['email']},{sub['timestamp']}\n"
+        
+        # Return as downloadable CSV
+        return csv_data, 200, {
+            'Content-Type': 'text/csv',
+            'Content-Disposition': 'attachment; filename=subscribers.csv'
+        }
+    except Exception as e:
+        print(f"Error exporting subscribers: {e}")
+        traceback.print_exc()
+        return jsonify({'error': 'Server error'}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, port=9000)
