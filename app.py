@@ -126,47 +126,63 @@ Use EXACTLY these headings and bullet points as shown. Keep responses concise bu
         }
 
         print("Sending request to OpenAI API...")
-        response = session.post(
-            api_endpoint,
-            headers=headers,
-            json=data,
-            timeout=8
-        )
-        print(f"Response status code: {response.status_code}")
+        try:
+            response = session.post(
+                api_endpoint,
+                headers=headers,
+                json=data,
+                timeout=8
+            )
+            print(f"Response status code: {response.status_code}")
+            print(f"Response headers: {response.headers}")
+            
+            if response.status_code != 200:
+                error_msg = f"API Error: Status {response.status_code}"
+                try:
+                    error_data = response.json()
+                    print(f"Error response data: {error_data}")
+                    if 'error' in error_data:
+                        error_msg += f" - {error_data['error'].get('message', '')}"
+                    else:
+                        error_msg += f" - {json.dumps(error_data)}"
+                except Exception as e:
+                    error_msg += f" - {response.text}"
+                    print(f"Error parsing response: {str(e)}")
+                print(error_msg)
+                return {"error": error_msg}
 
-        if response.status_code != 200:
-            error_msg = f"API Error: Status {response.status_code}"
-            try:
-                error_data = response.json()
-                if 'error' in error_data:
-                    error_msg += f" - {error_data['error'].get('message', '')}"
-                else:
-                    error_msg += f" - {json.dumps(error_data)}"
-            except:
-                error_msg += f" - {response.text}"
+            response_data = response.json()
+            print(f"Response data: {json.dumps(response_data, indent=2)}")
+            
+            if 'choices' in response_data and len(response_data['choices']) > 0:
+                result = response_data['choices'][0]['message']['content']
+                print("API Response:", result)
+                return {"result": result}
+            else:
+                error_msg = "Unexpected response format from API"
+                print(f"{error_msg}: {json.dumps(response_data, indent=2)}")
+                return {"error": error_msg}
+
+        except requests.exceptions.Timeout:
+            error_msg = "Request timed out. Please try again with a shorter text."
             print(error_msg)
             return {"error": error_msg}
+        except requests.exceptions.RequestException as e:
+            error_msg = f"Request error: {str(e)}"
+            print(error_msg)
+            return {"error": error_msg}
+        except Exception as e:
+            error_msg = f"Error making API request: {str(e)}"
+            print(error_msg)
+            import traceback
+            print(f"Traceback: {traceback.format_exc()}")
+            return {"error": error_msg}
 
-        response_data = response.json()
-        if 'choices' in response_data and len(response_data['choices']) > 0:
-            result = response_data['choices'][0]['message']['content']
-            print("API Response:", result)  # Debug log
-            return {"result": result}
-        else:
-            print(f"Unexpected response format: {json.dumps(response_data, indent=2)}")
-            return {"error": "Unexpected response format from API"}
-
-    except requests.exceptions.Timeout:
-        error_msg = "Request timed out. Please try again with a shorter text."
-        print(error_msg)
-        return {"error": error_msg}
-    except requests.exceptions.RequestException as e:
-        error_msg = f"Request error: {str(e)}"
-        print(error_msg)
-        return {"error": error_msg}
     except Exception as e:
-        error_msg = f"Server error: {str(e)}"
+        error_msg = f"Server error in analyze_text: {str(e)}"
         print(error_msg)
+        import traceback
+        print(f"Traceback: {traceback.format_exc()}")
         return {"error": error_msg}
 
 @app.route('/analyze', methods=['POST'])
@@ -174,18 +190,37 @@ def analyze():
     try:
         data = request.get_json()
         if not data or 'text' not in data:
-            return jsonify({'error': 'No text provided'}), 400
+            print("Error: Invalid request data")
+            return jsonify({"error": "No text provided"}), 400
+
+        text = data['text']
+        if not text or not text.strip():
+            print("Error: Empty text provided")
+            return jsonify({"error": "Please provide some text to analyze"}), 400
+
+        # Get word count
+        word_count = len(text.split())
+        if word_count > 1000:
+            print(f"Error: Text too long ({word_count} words)")
+            return jsonify({"error": "Text is too long. Please keep it under 1000 words."}), 400
+
+        print(f"Analyzing text with {word_count} words...")
+        result = analyze_text(text)
         
-        result = analyze_text(data['text'])
-        if 'error' in result:
+        if "error" in result:
+            print(f"Analysis error: {result['error']}")
             return jsonify(result), 500
-        
-        print(f"Analysis completed successfully")
+            
+        print("Analysis completed successfully")
         return jsonify(result)
+
     except Exception as e:
-        error_msg = f"Analysis error: {str(e)}"
-        print(error_msg)
-        return jsonify({'error': error_msg}), 500
+        error_msg = f"Server error: {str(e)}"
+        print(f"Unexpected error in /analyze: {error_msg}")
+        print(f"Exception type: {type(e)}")
+        import traceback
+        print(f"Traceback: {traceback.format_exc()}")
+        return jsonify({"error": error_msg}), 500
 
 @app.route('/upload', methods=['GET', 'POST'])
 def upload_file():
