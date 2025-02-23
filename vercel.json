@@ -1,21 +1,9 @@
 {
   "version": 2,
-  "buildCommand": "cd greenlight && npm install && npm run build",
-  "outputDirectory": "greenlight/.next",
   "framework": "nextjs",
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/greenlight/$1"
-    }
-  ],
+  "rootDirectory": "greenlight",
   "env": {
     "MONGODB_URI": "@mongodb_uri",
     "OPENAI_API_KEY": "@openai_api_key"
-  },
-  "git": {
-    "deploymentEnabled": {
-      "main": true
-    }
   }
 }
