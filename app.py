@@ -8,6 +8,9 @@ from datetime import datetime
 from pymongo import MongoClient
 from bson import json_util
 import traceback
+import PyPDF2
+import tiktoken
+import io
 
 # Load environment variables from .env file
 load_dotenv()
@@ -110,21 +113,250 @@ def subscribe():
         # For debugging, return the actual error message
         return jsonify({'success': False, 'message': error_msg}), 500
 
-def analyze_text(text):
+def process_pdf(file):
+    """Process PDF file and extract text"""
+    try:
+        # Read PDF file
+        pdf_reader = PyPDF2.PdfReader(io.BytesIO(file.read()))
+        text = ""
+        
+        # Extract text from all pages
+        for page in pdf_reader.pages:
+            text += page.extract_text() + "\n"
+            
+        return text.strip()
+    except Exception as e:
+        print(f"Error processing PDF: {str(e)}")
+        traceback.print_exc()
+        raise
+
+def split_text_into_chunks(text, max_tokens=3000):
+    """Split text into chunks that won't exceed token limit"""
+    encoding = tiktoken.encoding_for_model("gpt-4")
+    tokens = encoding.encode(text)
+    chunks = []
+    current_chunk = []
+    current_length = 0
+    
+    for token in tokens:
+        if current_length >= max_tokens:
+            chunks.append(encoding.decode(current_chunk))
+            current_chunk = []
+            current_length = 0
+        current_chunk.append(token)
+        current_length += 1
+    
+    if current_chunk:
+        chunks.append(encoding.decode(current_chunk))
+    
+    return chunks
+
+def validate_and_fix_comps(analysis, time_range, session, api_key, base_url, org_id, headers):
+    if time_range != 'recent':
+        return analysis
+
+    current_year = 2025  # Since we know the current year from metadata
+    cutoff_year = current_year - 5
+
+    validation_prompt = f"""You are a literary agent validating comparable titles. The following analysis contains titles that may be older than {cutoff_year}.
+For each title, check its publication year. If any title was published before {cutoff_year}, provide a new comparable title published in {cutoff_year} or later that matches the same criteria.
+
+Current analysis:
+{analysis}
+
+For any title published before {cutoff_year}, provide a replacement in this format:
+REPLACE: [Old Title] ([Old Year])
+WITH: [New Title] by [Author] ([Year]) - [2-3 sentences explaining why this is a good replacement]
+
+If all titles are from {cutoff_year} or later, respond with: "All titles are within the 5-year range."
+
+Remember:
+1. Only suggest replacements for titles published before {cutoff_year}
+2. All replacement titles must be published in {cutoff_year} or later
+3. Maintain the same type of comparison (thematic, genre, voice, or trope) as the original
+4. Ensure the replacement title is not already used elsewhere in the analysis
+5. Include the publication year for each replacement title"""
+
+    data = {
+        'model': 'gpt-4',
+        'messages': [
+            {
+                'role': 'system',
+                'content': validation_prompt
+            },
+            {
+                'role': 'user',
+                'content': 'Please validate and provide replacements if needed.'
+            }
+        ],
+        'temperature': 0.7,
+        'max_tokens': 1000
+    }
+
+    try:
+        response = session.post(
+            f"{base_url}/v1/chat/completions",
+            headers=headers,
+            json=data,
+            timeout=60
+        )
+        
+        if response.status_code != 200:
+            return analysis
+
+        validation_result = response.json()['choices'][0]['message']['content']
+        
+        if "All titles are within the 5-year range" in validation_result:
+            return analysis
+
+        # Process replacements
+        replacements = []
+        for line in validation_result.split('\n'):
+            if line.startswith('REPLACE:'):
+                old_new = line.split('\nWITH:')
+                if len(old_new) == 2:
+                    old_title = old_new[0].replace('REPLACE:', '').strip()
+                    new_title_full = old_new[1].strip()
+                    replacements.append((old_title, new_title_full))
+
+        # Apply replacements
+        updated_analysis = analysis
+        for old_title, new_title_full in replacements:
+            # Extract just the title part from the old_title (before the year)
+            old_title_clean = old_title.split('(')[0].strip()
+            # Find and replace while preserving formatting
+            updated_analysis = updated_analysis.replace(old_title_clean, new_title_full)
+
+        return updated_analysis
+
+    except Exception as e:
+        print(f"Error in validation: {str(e)}")
+        return analysis
+
+def analyze_chunk(chunk, time_range, session):
     try:
         api_key = os.getenv('OPENAI_API_KEY')
         base_url = os.getenv('OPENAI_BASE_URL')
         org_id = os.getenv('OPENAI_ORG_ID')
         
-        if not api_key:
-            print("Error: API key not set")
-            return {"error": "API key not set. Please check server configuration."}
-        if not base_url:
-            print("Error: API base URL not set")
-            return {"error": "API base URL not set. Please check server configuration."}
+        if not api_key or not base_url:
+            raise Exception("API configuration missing")
 
-        print(f"Making request to: {base_url}")
+        headers = {
+            'Authorization': f'Bearer {api_key}',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'User-Agent': 'ManuscriptAnalysis/1.0'
+        }
         
+        if org_id:
+            headers['X-Organization-ID'] = org_id
+
+        api_endpoint = f"{base_url}/v1/chat/completions"
+
+        system_prompt = f"""You are a professional literary agent compiling a final manuscript analysis. 
+Provide a concise analysis using EXACTLY this format with these EXACT headings:
+
+PRIMARY COMPARABLE TITLES:
+These are the three most similar overall matches to the manuscript{' published in the last 5 years (2020-2025)' if time_range == 'recent' else ''}:
+
+1. [Title 1 by Author] ([Publication Year]) - {' Must be 2020 or later' if time_range == 'recent' else ''}
+   - [2-3 sentences explaining overall similarities in multiple aspects]
+
+2. [Title 2 by Author] ([Publication Year]) - {' Must be 2020 or later' if time_range == 'recent' else ''}
+   - [2-3 sentences explaining overall similarities in multiple aspects]
+
+3. [Title 3 by Author] ([Publication Year]) - {' Must be 2020 or later' if time_range == 'recent' else ''}
+   - [2-3 sentences explaining overall similarities in multiple aspects]
+
+THEMATIC COMPARABLE:
+[Title by Author] ([Publication Year]) - {' Must be 2020 or later' if time_range == 'recent' else ''}
+- [2-3 sentences focusing specifically on thematic similarities, even if the genre, style, or target audience differs]
+
+GENRE COMPARABLE:
+[Title by Author] ([Publication Year]) - {' Must be 2020 or later' if time_range == 'recent' else ''}
+- [2-3 sentences focusing specifically on genre similarities and conventions, even if themes or style differs]
+
+VOICE COMPARABLE:
+[Title by Author] ([Publication Year]) - {' Must be 2020 or later' if time_range == 'recent' else ''}
+- [2-3 sentences focusing specifically on writing style and narrative voice similarities, even if genre or themes differ]
+
+TROPE COMPARABLE:
+[Title by Author] ([Publication Year]) - {' Must be 2020 or later' if time_range == 'recent' else ''}
+- [2-3 sentences focusing specifically on similar story tropes and plot devices, even if execution differs]
+
+Note: Each title should be unique. If the best match for a category is already listed, use the next best match. 
+Exclude any titles that are part of the same series or by the same author as the submitted manuscript.
+{' All comparable titles must have been published in 2020 or later.' if time_range == 'recent' else ''}"""
+
+        # Initial analysis
+        for attempt in range(3):
+            try:
+                data = {
+                    'model': 'gpt-4',
+                    'messages': [
+                        {
+                            'role': 'system',
+                            'content': system_prompt
+                        },
+                        {
+                            'role': 'user',
+                            'content': f"Analyze this manuscript chunk:\n\n{chunk}"
+                        }
+                    ],
+                    'temperature': 0.7,
+                    'max_tokens': 1000
+                }
+
+                response = session.post(
+                    api_endpoint,
+                    headers=headers,
+                    json=data,
+                    timeout=60
+                )
+                
+                if response.status_code != 200:
+                    error_message = f"API Error: {response.status_code}"
+                    try:
+                        error_data = response.json()
+                        if 'error' in error_data:
+                            error_message += f" - {error_data['error'].get('message', '')}"
+                    except:
+                        error_message += f" - {response.text}"
+                    raise Exception(error_message)
+
+                analysis = response.json()['choices'][0]['message']['content']
+                
+                # Validate and fix publication years if needed
+                if time_range == 'recent':
+                    analysis = validate_and_fix_comps(analysis, time_range, session, api_key, base_url, org_id, headers)
+                
+                return analysis
+
+            except requests.exceptions.Timeout:
+                if attempt == 2:
+                    raise Exception("The analysis is taking longer than expected. Please try again with a shorter text.")
+                continue
+            except requests.exceptions.RequestException as e:
+                if attempt == 2:
+                    raise Exception(f"Error communicating with the analysis service: {str(e)}")
+                continue
+
+    except Exception as e:
+        print(f"Error analyzing chunk: {str(e)}")
+        traceback.print_exc()
+        raise
+
+def compile_analysis(chunk_analyses):
+    """Compile all chunk analyses into a final comprehensive analysis"""
+    try:
+        api_key = os.getenv('OPENAI_API_KEY')
+        base_url = os.getenv('OPENAI_BASE_URL')
+        org_id = os.getenv('OPENAI_ORG_ID')
+        
+        if not api_key or not base_url:
+            raise Exception("API configuration missing")
+
         headers = {
             'Authorization': f'Bearer {api_key}',
             'Content-Type': 'application/json',
@@ -138,10 +370,41 @@ def analyze_text(text):
         session = requests.Session()
         api_endpoint = f"{base_url}/v1/chat/completions"
 
-        system_prompt = """You are a professional literary agent analyzing manuscripts. 
+        system_prompt = """You are a professional literary agent compiling a final manuscript analysis. 
 Provide a concise analysis using EXACTLY this format with these EXACT headings:
 
+PRIMARY COMPARABLE TITLES:
+These are the three most similar overall matches to the manuscript:
+
+1. [Title 1 by Author]
+   - [2-3 sentences explaining overall similarities in multiple aspects]
+
+2. [Title 2 by Author]
+   - [2-3 sentences explaining overall similarities in multiple aspects]
+
+3. [Title 3 by Author]
+   - [2-3 sentences explaining overall similarities in multiple aspects]
+
+THEMATIC COMPARABLE:
+[Title by Author]
+- [2-3 sentences focusing specifically on thematic similarities, even if the genre, style, or target audience differs]
+
+GENRE COMPARABLE:
+[Title by Author]
+- [2-3 sentences focusing specifically on genre similarities and conventions, even if themes or style differs]
+
+VOICE COMPARABLE:
+[Title by Author]
+- [2-3 sentences focusing specifically on writing style and narrative voice similarities, even if genre or themes differ]
+
+TROPE COMPARABLE:
+[Title by Author]
+- [2-3 sentences focusing specifically on similar story tropes and plot devices, even if execution differs]
+
+Note: Each title should be unique. If the best match for a category is already listed, use the next best match. Exclude any titles that are part of the same series or by the same author as the submitted manuscript.
+
 COMMERCIAL SCORE: [Score]/10
+
 STRENGTHS:
 - [Key strength 1]
 - [Key strength 2]
@@ -157,16 +420,7 @@ GENRES:
 - Secondary: [Secondary genre if applicable]
 
 TARGET AUDIENCE:
-- [Core demographic description]
-
-COMP TITLES:
-- [Title 1 by Author]
-- [Title 2 by Author]
-- [Title 3 by Author]
-
-Use EXACTLY these headings and bullet points as shown. Keep responses concise but specific."""
-
-        user_prompt = f"Analyze this manuscript excerpt following the EXACT format specified:\n\n{text}"
+- [Core demographic description]"""
 
         data = {
             'model': 'gpt-4',
@@ -177,131 +431,103 @@ Use EXACTLY these headings and bullet points as shown. Keep responses concise bu
                 },
                 {
                     'role': 'user',
-                    'content': user_prompt
+                    'content': f"Based on these chunk analyses, provide a comprehensive manuscript analysis:\n\n{json.dumps(chunk_analyses, indent=2)}"
                 }
             ],
             'temperature': 0.7,
-            'max_tokens': 1000,
-            'presence_penalty': 0.3,
-            'frequency_penalty': 0.3
+            'max_tokens': 1500
         }
 
-        print("Sending request to OpenAI API...")
-        try:
-            response = session.post(
-                api_endpoint,
-                headers=headers,
-                json=data,
-                timeout=8
-            )
-            print(f"Response status code: {response.status_code}")
-            print(f"Response headers: {response.headers}")
-            
-            if response.status_code != 200:
-                error_msg = f"API Error: Status {response.status_code}"
-                try:
-                    error_data = response.json()
-                    print(f"Error response data: {error_data}")
-                    if 'error' in error_data:
-                        error_msg += f" - {error_data['error'].get('message', '')}"
-                    else:
-                        error_msg += f" - {json.dumps(error_data)}"
-                except Exception as e:
-                    error_msg += f" - {response.text}"
-                    print(f"Error parsing response: {str(e)}")
-                print(error_msg)
-                return {"error": error_msg}
+        response = session.post(
+            api_endpoint,
+            headers=headers,
+            json=data,
+            timeout=30
+        )
+        
+        if response.status_code != 200:
+            raise Exception(f"API Error: {response.status_code} - {response.text}")
 
-            response_data = response.json()
-            print(f"Response data: {json.dumps(response_data, indent=2)}")
-            
-            if 'choices' in response_data and len(response_data['choices']) > 0:
-                result = response_data['choices'][0]['message']['content']
-                print("API Response:", result)
-                return {"result": result}
-            else:
-                error_msg = "Unexpected response format from API"
-                print(f"{error_msg}: {json.dumps(response_data, indent=2)}")
-                return {"error": error_msg}
-
-        except requests.exceptions.Timeout:
-            error_msg = "Request timed out. Please try again with a shorter text."
-            print(error_msg)
-            return {"error": error_msg}
-        except requests.exceptions.RequestException as e:
-            error_msg = f"Request error: {str(e)}"
-            print(error_msg)
-            return {"error": error_msg}
-        except Exception as e:
-            error_msg = f"Error making API request: {str(e)}"
-            print(error_msg)
-            import traceback
-            print(f"Traceback: {traceback.format_exc()}")
-            return {"error": error_msg}
+        response_data = response.json()
+        return response_data['choices'][0]['message']['content']
 
     except Exception as e:
-        error_msg = f"Server error in analyze_text: {str(e)}\nType: {type(e)}"
-        print(error_msg)
-        import traceback
-        print(f"Traceback: {traceback.format_exc()}")
-        return {"error": error_msg}
+        print(f"Error compiling analysis: {str(e)}")
+        traceback.print_exc()
+        raise
 
 @app.route('/analyze', methods=['POST'])
 def analyze():
     try:
         data = request.get_json()
-        if not data or 'text' not in data:
-            print("Error: Invalid request data")
-            return jsonify({"error": "No text provided"}), 400
+        text = data.get('text', '')
+        time_range = data.get('timeRange', 'all')
 
-        text = data['text']
-        if not text or not text.strip():
-            print("Error: Empty text provided")
-            return jsonify({"error": "Please provide some text to analyze"}), 400
+        if not text:
+            return jsonify({'error': 'No text provided'}), 400
 
-        # Get word count
-        word_count = len(text.split())
-        if word_count > 1000:
-            print(f"Error: Text too long ({word_count} words)")
-            return jsonify({"error": "Text is too long. Please keep it under 1000 words."}), 400
-
-        print(f"Analyzing text with {word_count} words...")
-        result = analyze_text(text)
-        
-        if "error" in result:
-            print(f"Analysis error: {result['error']}")
-            return jsonify(result), 500
-            
-        print("Analysis completed successfully")
-        return jsonify(result)
+        analysis = analyze_text(text, time_range)
+        return jsonify({'result': analysis})
 
     except Exception as e:
-        error_msg = f"Server error: {str(e)}\nType: {type(e)}"
-        print(f"Unexpected error in /analyze: {error_msg}")
-        print(f"Exception type: {type(e)}")
-        import traceback
-        print(f"Traceback: {traceback.format_exc()}")
-        return jsonify({"error": error_msg}), 500
+        return jsonify({'error': str(e)}), 500
 
-@app.route('/upload', methods=['GET', 'POST'])
+@app.route('/upload', methods=['POST'])
 def upload_file():
-    if request.method == 'POST':
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+
+        file = request.files['file']
+        time_range = request.form.get('timeRange', 'all')
+
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+
+        if not file.filename.endswith('.pdf'):
+            return jsonify({'error': 'File must be a PDF'}), 400
+
+        # Read the PDF file
+        pdf_text = process_pdf(file)
+        
+        if not pdf_text.strip():
+            return jsonify({'error': 'Could not extract text from PDF'}), 400
+
+        # Analyze the extracted text
+        analysis = analyze_text(pdf_text, time_range)
+        return jsonify({'result': analysis})
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+def analyze_text(text, time_range='all'):
+    chunks = split_text_into_chunks(text)
+    all_analyses = []
+
+    session = requests.Session()
+    adapter = requests.adapters.HTTPAdapter(
+        max_retries=requests.urllib3.Retry(
+            total=3,
+            backoff_factor=1,
+            status_forcelist=[500, 502, 503, 504]
+        )
+    )
+    session.mount('http://', adapter)
+    session.mount('https://', adapter)
+
+    for chunk in chunks:
         try:
-            if 'file' not in request.files:
-                return jsonify({'error': 'No file part'}), 400
-            file = request.files['file']
-            
-            if file.filename == '':
-                return jsonify({'error': 'No selected file'}), 400
-            
-            # Read the file content into memory
-            file_content = file.read()
-            return jsonify({'message': 'File uploaded successfully!', 'size': len(file_content)})
+            analysis = analyze_chunk(chunk, time_range, session)
+            all_analyses.append(analysis)
+        except requests.exceptions.Timeout:
+            raise Exception("The analysis is taking longer than expected. Please try again with a shorter text or try again later.")
+        except requests.exceptions.RequestException as e:
+            raise Exception(f"Error communicating with the analysis service: {str(e)}")
         except Exception as e:
-            error_msg = f"Upload error: {str(e)}\nType: {type(e)}"
-            print(error_msg)
-            return jsonify({'error': error_msg}), 500
-    return render_template('index.html')
+            raise Exception(f"An unexpected error occurred: {str(e)}")
+
+    final_analysis = compile_analysis(all_analyses)
+    return final_analysis
 
 @app.route('/subscribers', methods=['GET'])
 def get_subscribers():

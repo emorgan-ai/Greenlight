@@ -192,6 +192,44 @@
             font-size: 0.95rem;
         }
 
+        .comps-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .comp-category {
+            background: white;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            border: 1px solid #e9ecef;
+        }
+
+        .comp-category h4 {
+            color: #464F5D;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .comp-category .title {
+            color: #5a6577;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+        }
+
+        .comp-category p {
+            color: #6c757d;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .primary-comps {
+            grid-column: 1 / -1;
+            margin-bottom: 1rem;
+        }
+
         .email-signup {
             background: white;
             border-radius: 8px;
@@ -362,119 +400,260 @@
             color: #6b7280;
             font-size: 0.875rem;
         }
+
+        .file-upload {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid #e9ecef;
+        }
+
+        .file-upload h3 {
+            color: #464F5D;
+            margin-bottom: 1rem;
+            font-weight: 600;
+        }
+
+        .file-input-container {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .file-input {
+            flex: 1;
+            padding: 0.5rem;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            background-color: #f8f9fa;
+        }
+
+        .or-divider {
+            text-align: center;
+            position: relative;
+            margin: 2rem 0;
+            color: #6c757d;
+        }
+
+        .or-divider::before,
+        .or-divider::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            width: 45%;
+            height: 1px;
+            background-color: #e9ecef;
+        }
+
+        .or-divider::before {
+            left: 0;
+        }
+
+        .or-divider::after {
+            right: 0;
+        }
+
+        #loadingMessage {
+            display: none;
+            text-align: center;
+            color: #6c757d;
+            margin: 1rem 0;
+            padding: 1rem;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+        }
+
+        .toggle-container {
+            position: fixed;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: white;
+            padding: 1rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border: 1px solid #e9ecef;
+            z-index: 1000;
+        }
+
+        .toggle-container h4 {
+            color: #464F5D;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .toggle-switch {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .toggle-option {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            cursor: pointer;
+        }
+
+        .toggle-option input[type="radio"] {
+            appearance: none;
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #464F5D;
+            border-radius: 50%;
+            outline: none;
+            cursor: pointer;
+        }
+
+        .toggle-option input[type="radio"]:checked {
+            background-color: #464F5D;
+            border: 2px solid #464F5D;
+            box-shadow: inset 0 0 0 3px white;
+        }
+
+        .toggle-option label {
+            font-size: 0.9rem;
+            color: #464F5D;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>STORY ANALYZER</h1>
         <p class="subtitle">Plot with Transparency</p>
-        <div class="email-signup">
-            <h3>Get Access to More Author Tools</h3>
-            <p>Subscribe to learn about our latest tools and resources for authors</p>
-            <div class="email-form">
-                <input type="email" id="email" placeholder="Enter your email" class="email-input">
-                <button onclick="subscribe()" class="subscribe-btn">Subscribe</button>
+
+        <div class="toggle-container">
+            <h4>Comparable Titles Range</h4>
+            <div class="toggle-switch">
+                <div class="toggle-option">
+                    <input type="radio" id="all" name="timeRange" value="all" checked>
+                    <label for="all">All Time</label>
+                </div>
+                <div class="toggle-option">
+                    <input type="radio" id="recent" name="timeRange" value="recent">
+                    <label for="recent">Last 5 Years</label>
+                </div>
             </div>
-            <div id="subscribe-status"></div>
-        </div>
-        
-        <div class="input-container">
-            <textarea id="queryText" placeholder="Enter your plot summary here..."></textarea>
-            <button onclick="analyzeText()" id="analyzeBtn" class="submit-btn">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="16" height="16">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
-                </svg>
-                Submit
-            </button>
         </div>
 
-        <div id="status"></div>
-        <div id="result" class="mt-4 p-4 bg-white rounded shadow-sm" style="display: none;">
-            <div id="loading" class="loading-container" style="display: none;">
-                <div class="loading-spinner">
-                    <i class="fas fa-spinner fa-spin fa-2x"></i>
+        <div class="file-upload">
+            <h3>Upload Manuscript (PDF)</h3>
+            <p style="color: #6c757d; margin-bottom: 1rem;">Upload your manuscript as a PDF file (up to 10 pages)</p>
+            <form id="uploadForm" enctype="multipart/form-data">
+                <div class="file-input-container">
+                    <input type="file" id="pdfFile" accept=".pdf" class="file-input" required>
+                    <button type="submit" class="submit-btn">Analyze PDF</button>
                 </div>
-                <p class="loading-text">Analyzing your text...</p>
-                <p class="loading-subtext">For best results, keep your text under 1000 words.</p>
+            </form>
+        </div>
+
+        <div class="or-divider">OR</div>
+
+        <div class="input-container">
+            <textarea id="queryText" placeholder="Paste your text here (up to 1000 words)..."></textarea>
+            <button onclick="analyzeText()" class="submit-btn">Analyze Text</button>
+        </div>
+
+        <div id="loadingMessage">Analyzing your manuscript... This may take a few moments.</div>
+        <div id="status"></div>
+        <div id="result"></div>
+
+        <div class="email-signup">
+            <h3>Get Updates</h3>
+            <p>Subscribe to receive news about our latest features and updates.</p>
+            <div class="email-form">
+                <input type="email" id="email" placeholder="Enter your email">
+                <button onclick="subscribe()" class="submit-btn">Subscribe</button>
             </div>
-            <div id="analysisResult" style="display: none;"></div>
         </div>
     </div>
 
     <script>
-        async function analyzeText() {
-            const text = document.getElementById('queryText').value;
-            const analyzeBtn = document.getElementById('analyzeBtn');
-            const status = document.getElementById('status');
-            const result = document.getElementById('result');
-            const loading = document.getElementById('loading');
-            const analysisResult = document.getElementById('analysisResult');
+        const uploadForm = document.getElementById('uploadForm');
+        const loadingMessage = document.getElementById('loadingMessage');
+        const status = document.getElementById('status');
+        const result = document.getElementById('result');
+
+        uploadForm.onsubmit = async (e) => {
+            e.preventDefault();
+            const fileInput = document.getElementById('pdfFile');
+            const file = fileInput.files[0];
+            const timeRange = document.querySelector('input[name="timeRange"]:checked').value;
             
-            if (!text.trim()) {
-                status.textContent = 'Please enter some text to analyze';
+            if (!file) {
+                showStatus('Please select a PDF file', 'error');
                 return;
             }
 
-            // Check text length
-            const wordCount = text.trim().split(/\s+/).length;
-            if (wordCount > 1000) {
-                status.textContent = 'Please enter a shorter text (maximum 1000 words)';
+            if (!file.name.endsWith('.pdf')) {
+                showStatus('Please upload a PDF file', 'error');
                 return;
             }
 
-            // Disable button and show loading state
-            analyzeBtn.disabled = true;
-            result.style.display = 'block';
-            loading.style.display = 'block';
-            analysisResult.style.display = 'none';
-            status.textContent = '';
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('timeRange', timeRange);
 
             try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 25000); // 25 second timeout
+                showLoading();
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
 
+                const data = await response.json();
+                if (response.ok) {
+                    result.innerHTML = formatAnalysis(data.result);
+                    showStatus('Analysis complete!', 'success');
+                } else {
+                    showStatus(data.error || 'Error analyzing PDF', 'error');
+                }
+            } catch (error) {
+                showStatus('Error uploading file: ' + error.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        };
+
+        async function analyzeText() {
+            const text = document.getElementById('queryText').value.trim();
+            const timeRange = document.querySelector('input[name="timeRange"]:checked').value;
+            
+            if (!text) {
+                showStatus('Please enter some text to analyze', 'error');
+                return;
+            }
+
+            try {
+                showLoading();
                 const response = await fetch('/analyze', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ text: text }),
-                    signal: controller.signal
+                    body: JSON.stringify({ 
+                        text: text,
+                        timeRange: timeRange
+                    })
                 });
 
-                clearTimeout(timeoutId);
-
-                // Check if the response is ok (status in 200-299 range)
-                if (!response.ok) {
-                    if (response.status === 504) {
-                        throw new Error('The request timed out. Please try again with a shorter text.');
-                    }
-                    throw new Error(`Request failed with status ${response.status}`);
-                }
-
                 const data = await response.json();
-                
-                if (data.error) {
-                    throw new Error(data.error);
+                if (response.ok) {
+                    result.innerHTML = formatAnalysis(data.result);
+                    showStatus('Analysis complete!', 'success');
+                } else {
+                    showStatus(data.error || 'Error analyzing text', 'error');
                 }
-
-                // Hide loading and show results
-                loading.style.display = 'none';
-                analysisResult.style.display = 'block';
-                analysisResult.innerHTML = formatAnalysis(data.result);
             } catch (error) {
-                console.error('Error:', error);
-                loading.style.display = 'none';
-                analysisResult.style.display = 'block';
-                analysisResult.innerHTML = `
-                    <div class="error-message p-4 bg-red-100 text-red-700 rounded">
-                        <p><strong>Error:</strong> ${error.message}</p>
-                        ${error.message.includes('timed out') ? 
-                            '<p class="mt-2">Suggestions:<br>- Try submitting a shorter text<br>- Break your text into smaller sections</p>' 
-                            : ''}
-                    </div>`;
+                showStatus('Error: ' + error.message, 'error');
             } finally {
-                analyzeBtn.disabled = false;
+                hideLoading();
             }
         }
 
@@ -483,104 +662,106 @@
             
             console.log('Raw analysis text:', text);
             
-            // Split the text into sections
-            const sections = text.split('\n\n').filter(section => section.trim());
-            console.log('Parsed sections:', sections);
+            // Split the analysis into sections
+            const sections = text.split('\n\n');
+            let html = '<div class="analysis-results">';
             
-            let formattedHtml = '<div class="analysis-results">';
-            
-            // Process each major section
+            // Process each section
             sections.forEach(section => {
-                const lines = section.split('\n');
-                if (lines.length === 0) return;
-                
-                const title = lines[0].split(':')[0].trim();
-                console.log('Processing section:', title);
-                
-                if (title === 'COMMERCIAL SCORE') {
-                    const score = lines[0].split(':')[1].trim().split('/')[0];
-                    const scoreClass = parseInt(score) >= 7 ? 'score-high' : parseInt(score) >= 4 ? 'score-medium' : 'score-low';
+                if (section.trim()) {
+                    const [title, ...content] = section.split('\n');
                     
-                    formattedHtml += `
-                        <div class="analysis-section">
-                            <h3 class="section-title">${title}</h3>
-                            <div class="commercial-score">
-                                <div class="score-value ${scoreClass}">${score}/10</div>
-                            </div>
+                    if (title.includes('PRIMARY COMPARABLE TITLES')) {
+                        html += `<div class="analysis-section primary-comps">
+                            <h3>${title.trim()}</h3>`;
+                        
+                        // Skip the description line
+                        content.shift();
+                        
+                        // Process each primary comparable title
+                        let currentTitle = '';
+                        content.forEach(line => {
+                            if (line.trim()) {
+                                if (line.startsWith('1.') || line.startsWith('2.') || line.startsWith('3.')) {
+                                    if (currentTitle) {
+                                        html += '</div>';
+                                    }
+                                    html += `<div class="similar-title">
+                                        <h4>${line.trim()}</h4>`;
+                                    currentTitle = line;
+                                } else if (line.trim().startsWith('-')) {
+                                    html += `<p>${line.trim().substring(1).trim()}</p>`;
+                                }
+                            }
+                        });
+                        if (currentTitle) {
+                            html += '</div>';
+                        }
+                        html += '</div>';
+                    } else if (title === 'THEMATIC COMPARABLE' || title === 'GENRE COMPARABLE' || 
+                              title === 'VOICE COMPARABLE' || title === 'TROPE COMPARABLE') {
+                        html += `<div class="comp-category">
+                            <h4>${title.trim()}</h4>`;
+                        
+                        let titleFound = false;
+                        content.forEach(line => {
+                            if (line.trim()) {
+                                if (!titleFound && !line.trim().startsWith('-')) {
+                                    html += `<div class="title">${line.trim()}</div>`;
+                                    titleFound = true;
+                                } else if (line.trim().startsWith('-')) {
+                                    html += `<p>${line.trim().substring(1).trim()}</p>`;
+                                }
+                            }
+                        });
+                        html += '</div>';
+                    } else {
+                        html += `<div class="analysis-section">
+                            <h3>${title.trim()}</h3>
+                            <ul>
+                                ${content.map(line => line.trim() && `<li>${line.trim().replace(/^-\s*/, '')}</li>`).filter(Boolean).join('')}
+                            </ul>
                         </div>`;
-                } else if (title === 'STRENGTHS' || title === 'WEAKNESSES') {
-                    formattedHtml += `
-                        <div class="analysis-section">
-                            <h3 class="section-title">${title}</h3>
-                            <ul class="points-list">`;
-                    
-                    // Add each bullet point
-                    lines.slice(1).forEach(line => {
-                        if (line.trim().startsWith('-')) {
-                            formattedHtml += `<li>${line.substring(1).trim()}</li>`;
-                        }
-                    });
-                    
-                    formattedHtml += `</ul></div>`;
-                } else if (title === 'GENRES') {
-                    formattedHtml += `
-                        <div class="analysis-section">
-                            <h3 class="section-title">${title}</h3>
-                            <ul class="points-list">`;
-                    
-                    lines.slice(1).forEach(line => {
-                        if (line.trim().startsWith('-')) {
-                            formattedHtml += `<li>${line.substring(1).trim()}</li>`;
-                        }
-                    });
-                    
-                    formattedHtml += `</ul></div>`;
-                } else if (title === 'TARGET AUDIENCE') {
-                    formattedHtml += `
-                        <div class="analysis-section">
-                            <h3 class="section-title">${title}</h3>
-                            <ul class="points-list">`;
-                    
-                    lines.slice(1).forEach(line => {
-                        if (line.trim().startsWith('-')) {
-                            formattedHtml += `<li>${line.substring(1).trim()}</li>`;
-                        }
-                    });
-                    
-                    formattedHtml += `</ul></div>`;
-                } else if (title === 'COMP TITLES') {
-                    formattedHtml += `
-                        <div class="analysis-section">
-                            <h3 class="section-title">${title}</h3>
-                            <div class="comp-titles">`;
-                    
-                    lines.slice(1).forEach(line => {
-                        if (line.trim().startsWith('-')) {
-                            formattedHtml += `<p class="mb-2">${line.substring(1).trim()}</p>`;
-                        }
-                    });
-                    
-                    formattedHtml += `</div></div>`;
+                    }
                 }
             });
             
-            formattedHtml += '</div>';
-            return formattedHtml;
+            // Wrap specific comparable sections in a grid
+            html = html.replace(
+                /<div class="comp-category">/g, 
+                '<div class="comps-grid"><div class="comp-category">'
+            ).replace(
+                /<\/div>\s*<div class="analysis-section">/g,
+                '</div></div><div class="analysis-section">'
+            );
+            
+            return html + '</div>';
+        }
+
+        function showLoading() {
+            loadingMessage.style.display = 'block';
+            status.style.display = 'none';
+            result.innerHTML = '';
+        }
+
+        function hideLoading() {
+            loadingMessage.style.display = 'none';
+        }
+
+        function showStatus(message, type) {
+            status.textContent = message;
+            status.className = type;
+            status.style.display = 'block';
         }
 
         async function subscribe() {
-            const email = document.getElementById('email').value;
-            const statusDiv = document.getElementById('subscribe-status');
-            const subscribeBtn = document.querySelector('.subscribe-btn');
+            const email = document.getElementById('email').value.trim();
             
             if (!email) {
-                statusDiv.textContent = 'Please enter your email address';
-                statusDiv.className = 'error';
+                showStatus('Please enter your email', 'error');
                 return;
             }
 
-            subscribeBtn.disabled = true;
-            
             try {
                 const response = await fetch('/subscribe', {
                     method: 'POST',
@@ -591,21 +772,14 @@
                 });
 
                 const data = await response.json();
-                
                 if (response.ok) {
-                    statusDiv.textContent = data.message;
-                    statusDiv.className = 'success';
+                    showStatus(data.message, 'success');
                     document.getElementById('email').value = '';
                 } else {
-                    statusDiv.textContent = data.message;
-                    statusDiv.className = 'error';
+                    showStatus(data.message, 'error');
                 }
             } catch (error) {
-                console.error('Error:', error);
-                statusDiv.textContent = 'An error occurred. Please try again.';
-                statusDiv.className = 'error';
-            } finally {
-                subscribeBtn.disabled = false;
+                showStatus('Error: ' + error.message, 'error');
             }
         }
     </script>
