@@ -3,6 +3,9 @@
   "framework": "nextjs",
   "buildCommand": "npm run build",
   "installCommand": "npm install",
+  "routes": [
+    { "src": "/(.*)", "dest": "/" }
+  ],
   "env": {
     "MONGODB_URI": "@mongodb_uri",
     "OPENAI_API_KEY": "@openai_api_key",
