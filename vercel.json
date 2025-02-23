@@ -5,7 +5,6 @@
   "devCommand": "cd greenlight && npm run dev",
   "installCommand": "cd greenlight && npm install",
   "outputDirectory": "greenlight/.next",
-  "rootDirectory": "greenlight",
   "framework": "nextjs",
   "env": {
     "MONGODB_URI": "@mongodb_uri",
