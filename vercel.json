@@ -1,9 +1,15 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
-  "framework": "nextjs",
+  "buildCommand": "cd greenlight && npm install && npm run build",
+  "devCommand": "cd greenlight && npm run dev",
+  "installCommand": "cd greenlight && npm install",
+  "outputDirectory": "greenlight/.next",
   "rootDirectory": "greenlight",
+  "framework": "nextjs",
   "env": {
     "MONGODB_URI": "@mongodb_uri",
-    "OPENAI_API_KEY": "@openai_api_key"
+    "OPENAI_API_KEY": "@openai_api_key",
+    "NEXT_PUBLIC_API_URL": "@next_public_api_url"
   }
 }
